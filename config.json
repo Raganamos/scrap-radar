@@ -3,5 +3,11 @@
     {"site": "tampa", "lat": 27.95, "lon": -82.46, "miles": 40},
     {"site": "lakeland", "lat": 28.04, "lon": -81.95, "miles": 25}
   ],
+  "cl_queries": ["curb alert", "scrap", "free"],
+  "offerup_zips": ["33602", "33801", "33710"],
+  "trashnothing": [
+    {"lat": 27.95, "lon": -82.46, "radius_m": 60000},
+    {"lat": 28.04, "lon": -81.95, "radius_m": 40000}
+  ],
   "max_detail_lookups": 25
 }
