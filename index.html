@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Scrap Radar</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--bg:#0b100d;--pan:#131a15;--line:#24302a;--tx:#dfe9e1;--mut:#8a9a8e;--go:#4ade80;--warn:#fbbf24;--hot:#fb7185}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,sans-serif}
+header{padding:8px 12px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:1px solid var(--line)}
+h1{font:700 15px ui-monospace,monospace;letter-spacing:.15em;margin:0;color:var(--go)}
+#stat{font-size:12px;color:var(--mut);text-align:right}
+#map{height:46vh;min-height:260px;background:#0e1511}
+.bar{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;background:var(--pan);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:500}
+button,select{background:#1b251f;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-height:40px}
+button.on{background:var(--go);color:#04130a;border-color:var(--go);font-weight:600}
+#list{padding:8px 10px 60px;display:grid;gap:8px;max-width:760px;margin:auto}
+.card{background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:10px 12px;border-left:4px solid var(--line)}
+.card.s5{border-left-color:var(--hot)}.card.s4{border-left-color:var(--warn)}.card.s3{border-left-color:var(--go)}
+.card.new{box-shadow:0 0 0 1px var(--go) inset}
+.t{font-weight:600}.m{font-size:12.5px;color:var(--mut);margin:3px 0}.n{font-size:13px;margin:5px 0;color:#c9d6cc}
+.d{float:right;font:700 14px ui-monospace,monospace;color:var(--go);margin-left:8px;text-align:right}
+.acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.acts a,.acts button{flex:1;text-align:center;text-decoration:none;color:var(--tx);background:#1b251f;border:1px solid var(--line);border-radius:8px;padding:8px 6px;font-size:13px;min-height:38px}
+.acts a.go{background:var(--go);color:#04130a;font-weight:600;border-color:var(--go)}
+.tag{display:inline-block;font:600 10.5px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border-radius:4px;background:#1f2b24;color:var(--mut);margin-right:5px}
+.empty{color:var(--mut);text-align:center;padding:30px 10px}
+.me{width:16px;height:16px;border-radius:50%;background:#38bdf8;border:3px solid #fff;box-shadow:0 0 0 0 #38bdf8aa;animation:p 2s infinite}
+@keyframes p{to{box-shadow:0 0 0 18px #38bdf800}}
+@media (prefers-reduced-motion:reduce){.me{animation:none}}
+.leaflet-container{background:#0e1511}.leaflet-tile{filter:brightness(.72) contrast(1.1) saturate(.6)}
+</style></head><body>
+<header><h1>SCRAP RADAR</h1><div id="stat">starting…</div></header>
+<div id="map"></div>
+<div class="bar">
+  <button id="mAround" class="on">Around me</button><button id="mRoute">Along route</button>
+  <select id="rad" aria-label="Range"><option value="2">2 mi</option><option value="5" selected>5 mi</option><option value="10">10 mi</option><option value="25">25 mi</option><option value="999">Any</option></select>
+  <select id="min" aria-label="Minimum value"><option value="5">Top value only</option><option value="4" selected>Good and up</option><option value="3">Include materials</option><option value="1">Everything</option></select>
+  <button id="voice">Voice alerts off</button><button id="starOnly">★ Starred</button>
+</div>
+<div id="list"></div>
+<script>
+const $=id=>document.getElementById(id), R=3958.8, rad=x=>x*Math.PI/180;
+const LS=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||'null');localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
+let items=[],route=null,me=null,meManual=false,mode='around',voice=false,starOnly=false,scanned=null,statusOk=true;
+let hidden=new Set(LS('sr_hidden')||[]),starred=new Set(LS('sr_star')||[]),seen=new Set(LS('sr_seen')||[]),announced=new Set();
+const firstRun=!LS('sr_seen');
+function dist(a,b,c,d){const x=rad(d-b)*Math.cos(rad((a+c)/2)),y=rad(c-a);return Math.sqrt(x*x+y*y)*R}
+function bearing(a,b,c,d){const y=Math.sin(rad(d-b))*Math.cos(rad(c)),x=Math.cos(rad(a))*Math.sin(rad(c))-Math.sin(rad(a))*Math.cos(rad(c))*Math.cos(rad(d-b));return ['N','NE','E','SE','S','SW','W','NW'][Math.round(((Math.atan2(y,x)*180/Math.PI)+360)%360/45)%8]}
+function toRoute(la,lo){ // distance off the route line and the mile marker along it
+  if(!route)return{off:999,at:0};let best={off:1e9,at:0},run=0;const k=Math.cos(rad(la));
+  for(let i=0;i<route.pts.length-1;i++){const[a,b]=route.pts[i],[c,d]=route.pts[i+1],seg=dist(a,b,c,d);
+    const vx=(d-b)*k,vy=c-a,wx=(lo-b)*k,wy=la-a;let t=(vx*wx+vy*wy)/(vx*vx+vy*vy||1);t=Math.max(0,Math.min(1,t));
+    const off=dist(la,lo,a+(c-a)*t,b+(d-b)*t);if(off<best.off)best={off,at:run+seg*t};run+=seg}return best}
+const map=L.map('map',{zoomControl:false}).setView([27.93,-82.4],9);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+const pins=L.layerGroup().addTo(map);let meMark=null,ring=null,routeLine=null,followed=false;
+const color=s=>s>=5?'#fb7185':s>=4?'#fbbf24':s>=3?'#4ade80':'#6b7a70';
+function age(iso){if(!iso)return'';const h=(Date.now()-new Date(iso))/36e5;return h<1?Math.max(1,Math.round(h*60))+' min ago':h<48?Math.round(h)+' h ago':Math.round(h/24)+' d ago'}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function render(){
+  const r=+$('rad').value,min=+$('min').value,myAt=me&&route?toRoute(me.la,me.lo).at:0;
+  let rows=items.filter(i=>!hidden.has(i.id)&&(starOnly?starred.has(i.id):i.s>=min)).map(i=>{const rt=toRoute(i.la,i.lo);
+    return{...i,off:rt.off,at:rt.at,dm:me?dist(me.la,me.lo,i.la,i.lo):null}});
+  if(!starOnly){if(mode==='around'){if(me)rows=rows.filter(i=>i.dm<=r)}else rows=rows.filter(i=>i.off<=r&&(!me||meManual||i.at>=myAt-1))}
+  rows.sort(mode==='route'?(a,b)=>a.at-b.at:(a,b)=>me?a.dm-b.dm:b.s-a.s||a.at-b.at);
+  pins.clearLayers();
+  rows.forEach(i=>L.circleMarker([i.la,i.lo],{radius:i.px==='exact'?8:6,color:color(i.s),weight:2,fillOpacity:i.px==='exact'?.85:.35,dashArray:i.px==='exact'?null:'3'}).addTo(pins)
+    .bindPopup(`<b>${esc(i.t)}</b><br>${esc(i.h)}<br><a href="${i.u}" target="_blank" rel="noopener">Open listing</a>`));
+  if(ring){ring.remove();ring=null}
+  if(me&&mode==='around'&&r<900)ring=L.circle([me.la,me.lo],{radius:r*1609.34,color:'#4ade80',weight:1,fillOpacity:.05}).addTo(map);
+  $('list').innerHTML=rows.length?rows.map(i=>{const isNew=!firstRun&&!seen.has(i.id);
+    const where=(i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}</div>`:'');
+    return `<div class="card s${i.s}${isNew?' new':''}">${where}<div class="t">${starred.has(i.id)?'★ ':''}${esc(i.t)}</div>
+    <div class="m"><span class="tag">${i.c}</span>${isNew?'<span class="tag" style="color:#4ade80">new</span>':''}${esc(i.h)} · mile ${i.at.toFixed(0)} of route, ${i.off.toFixed(1)} mi off · ${i.px==='exact'?'pin exact':'pin approximate'}${i.posted?' · posted '+age(i.posted):''}</div>
+    ${i.n?`<div class="n">${esc(i.n)}</div>`:''}
+    <div class="acts"><a class="go" href="https://www.google.com/maps/dir/?api=1&destination=${i.la},${i.lo}" target="_blank" rel="noopener">Navigate</a><a href="${i.u}" target="_blank" rel="noopener">Listing</a><button data-star="${i.id}">${starred.has(i.id)?'Unstar':'Star'}</button><button data-hide="${i.id}">Hide</button></div></div>`}).join('')
+    :`<div class="empty">${me||mode==='route'?'Nothing in range at this value level. Widen the range or lower the value filter.':'Waiting for GPS. Tap the map to set your position by hand.'}</div>`;
+  $('stat').innerHTML=`${rows.length} shown / ${items.length} tracked<br>${me?(meManual?'position set by hand':'GPS live'):'no position yet'} · scan ${scanned?age(scanned):'?'}${statusOk?'':' · <span style="color:#fbbf24">last scan failed</span>'}`;
+  // spoken/vibrating alert for strong items that just came into range
+  if(me&&!meManual)rows.filter(i=>i.s>=4&&i.dm<=Math.min(r,5)&&!announced.has(i.id)).slice(0,2).forEach(i=>{announced.add(i.id);
+    try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
+    if(voice&&window.speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance(`${i.t}, ${i.dm.toFixed(1)} miles ${bearing(me.la,me.lo,i.la,i.lo)}`))});
+}
+function setMe(la,lo,manual){me={la,lo};meManual=manual;if(!meMark)meMark=L.marker([la,lo],{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[16,16],iconAnchor:[8,8]}),zIndexOffset:1000}).addTo(map);else meMark.setLatLng([la,lo]);
+  if(!followed){followed=true;map.setView([la,lo],mode==='around'?12:10)}render()}
+async function load(){try{
+  const[d,s]=await Promise.all([fetch('listings.json?t='+Date.now()).then(r=>r.json()),fetch('status.json?t='+Date.now()).then(r=>r.json()).catch(()=>({ok:true}))]);
+  items=d.items;scanned=d.scanned;statusOk=s.ok!==false;
+  if(!route){route=await fetch('route.json').then(r=>r.json());routeLine=L.polyline(route.pts,{color:'#38bdf8',weight:3,opacity:.7}).addTo(map);
+    L.marker([route.dest.la,route.dest.lo]).addTo(map).bindPopup(esc(route.dest.name))}
+  render();if(firstRun||seen.size===0){items.forEach(i=>seen.add(i.id));LS('sr_seen',[...seen])}
+}catch(e){$('stat').textContent='Could not load scan data'}}
+document.addEventListener('click',e=>{const t=e.target;
+  if(t.dataset.hide){hidden.add(t.dataset.hide);LS('sr_hidden',[...hidden]);render()}
+  if(t.dataset.star){starred.has(t.dataset.star)?starred.delete(t.dataset.star):starred.add(t.dataset.star);LS('sr_star',[...starred]);render()}});
+$('mAround').onclick=()=>{mode='around';$('mAround').classList.add('on');$('mRoute').classList.remove('on');render()};
+$('mRoute').onclick=()=>{mode='route';$('mRoute').classList.add('on');$('mAround').classList.remove('on');if(routeLine)map.fitBounds(routeLine.getBounds(),{padding:[20,20]});render()};
+$('rad').onchange=$('min').onchange=render;
+$('voice').onclick=()=>{voice=!voice;$('voice').textContent='Voice alerts '+(voice?'on':'off');$('voice').classList.toggle('on',voice);if(voice&&window.speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance('Voice alerts on'))};
+$('starOnly').onclick=()=>{starOnly=!starOnly;$('starOnly').classList.toggle('on',starOnly);render()};
+map.on('click',e=>{if(!me||meManual)setMe(e.latlng.lat,e.latlng.lng,true)});
+if(navigator.geolocation)navigator.geolocation.watchPosition(p=>setMe(p.coords.latitude,p.coords.longitude,false),()=>render(),{enableHighAccuracy:true,maximumAge:15000,timeout:30000});
+if(navigator.wakeLock){const wl=()=>navigator.wakeLock.request('screen').catch(()=>{});wl();document.addEventListener('visibilitychange',()=>document.visibilityState==='visible'&&wl())}
+load();setInterval(()=>{seen=new Set([...seen]);load()},180000);
+window.addEventListener('pagehide',()=>{items.forEach(i=>seen.add(i.id));LS('sr_seen',[...seen])});
+</script></body></html>
