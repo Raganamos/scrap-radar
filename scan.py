@@ -4,7 +4,7 @@ value, geocodes them and writes listings.json for the radar page.
   python scan.py            live scan (runs in GitHub Actions)
   python scan.py --seed F   build from a seed file of 'path|title|hood' lines
 """
-import json, re, sys, time, hashlib, os, html, urllib.request
+import json, re, sys, time, hashlib, os, html, urllib.request, urllib.parse
 from datetime import datetime, timezone
 
 CFG = json.load(open("config.json"))
@@ -42,22 +42,83 @@ def area_geo(path, hood, lid):
     d = hashlib.md5(lid.encode()).digest()   # small stable offset so pins in one area don't stack
     return (round(pt[0] + (d[0] - 128) / 128 * 0.006, 5), round(pt[1] + (d[1] - 128) / 128 * 0.006, 5))
 
+ALIAS = {"st pete beach": "st pete beach", "st. pete beach": "st pete beach", "st pete": "saint-petersburg", "st. pete": "saint-petersburg",
+         "st petersburg": "saint-petersburg", "st. petersburg": "saint-petersburg", "land o": "land-lakes", "town 'n' country": "town n country",
+         "town n country": "town n country", "temple terrace": (28.035, -82.389), "apollo beach": (27.773, -82.407), "gibsonton": (27.853, -82.382),
+         "lithia": (27.866, -82.21), "thonotosassa": (28.061, -82.302), "winter haven": (28.022, -81.733), "haines city": (28.114, -81.618),
+         "davenport": (28.161, -81.602), "polk city": (28.182, -81.824), "kathleen": (28.121, -82.023), "highland city": "highland city",
+         "ulmerton": (27.894, -82.75), "kenneth city": (27.816, -82.72), "indian rocks": (27.875, -82.85), "treasure island": (27.769, -82.769),
+         "redington": (27.82, -82.82), "south pasadena": "south pasadena", "tierra verde": (27.692, -82.723), "citrus park": (28.078, -82.57),
+         "egypt lake": (28.017, -82.506), "pebble creek": (28.148, -82.345), "fishhawk": (27.851, -82.21), "bloomingdale": (27.893, -82.24)}
+
+def geo_text(text, lid):
+    """Place a listing from free text such as 'Pinellas Park, FL' or 'Off Ulmerton, Largo Mall area'."""
+    h = (text or "").lower(); pt = None
+    for k, v in sorted(ALIAS.items(), key=lambda kv: -len(kv[0])):
+        if k in h:
+            pt = v if isinstance(v, tuple) else HOOD.get(v) or CITY.get(v); break
+    if not pt: pt = next((v for k, v in HOOD.items() if k in h), None)
+    if not pt: pt = next((v for k, v in sorted(CITY.items(), key=lambda kv: -len(kv[0])) if k.replace("-", " ") in h), None)
+    if not pt: return None
+    d = hashlib.md5(lid.encode()).digest()
+    return (round(pt[0] + (d[0] - 128) / 128 * 0.006, 5), round(pt[1] + (d[1] - 128) / 128 * 0.006, 5))
+
 def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Language": "en-US,en;q=0.9"})
     return urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
 
-def live_rows():
-    rows, seen = [], set()
+def cl_parse(page, seen, rows):
+    for m in re.finditer(r'<li class="cl-static-search-result"[^>]*>\s*<a href="([^"]+)">(.*?)</a>', page, re.S):
+        url, body = m.group(1), m.group(2)
+        t = re.search(r'class="title">(.*?)</div>', body, re.S); l = re.search(r'class="location">(.*?)</div>', body, re.S)
+        lid = re.sub(r"\.html$", "", url.rstrip("/").split("/")[-1])
+        if lid in seen or not t: continue
+        seen.add(lid)
+        rows.append((url, html.unescape(t.group(1)).strip(), html.unescape(l.group(1)).strip() if l else "", lid, "cl"))
+
+def src_craigslist(seen, rows):
     for s in CFG["scans"]:
-        page = get(f"https://{s['site']}.craigslist.org/search/zip?lat={s['lat']}&lon={s['lon']}&search_distance={s['miles']}")
-        for m in re.finditer(r'<li class="cl-static-search-result"[^>]*>\s*<a href="([^"]+)">(.*?)</a>', page, re.S):
-            url, body = m.group(1), m.group(2)
-            t = re.search(r'class="title">(.*?)</div>', body, re.S); l = re.search(r'class="location">(.*?)</div>', body, re.S)
-            lid = re.sub(r"\.html$", "", url.rstrip("/").split("/")[-1])
-            if lid in seen or not t: continue
+        base = f"https://{s['site']}.craigslist.org/search/%s?lat={s['lat']}&lon={s['lon']}&search_distance={s['miles']}"
+        cl_parse(get(base % "zip"), seen, rows); time.sleep(2)
+        for q in CFG.get("cl_queries", []):   # free things people post in the for-sale sections
+            try: cl_parse(get(base % "sss" + "&max_price=0&query=" + urllib.parse.quote(q)), seen, rows)
+            except Exception: pass
+            time.sleep(2)
+
+def src_offerup(seen, rows):
+    for z in CFG.get("offerup_zips", []):
+        pg = get(f"https://offerup.com/search?q=free&price_max=0&zipcode={z}&radius=30")
+        nd = json.loads(re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', pg, re.S).group(1))
+        for t in nd["props"]["pageProps"]["searchFeedResponse"]["looseTiles"]:
+            x = t.get("listing") or {}
+            try: free = float(x.get("price") or 1) == 0
+            except ValueError: free = False
+            lid = "ou-" + str(x.get("listingId", ""))
+            if not x.get("listingId") or not free or lid in seen: continue
             seen.add(lid)
-            rows.append((url, html.unescape(t.group(1)).strip(), html.unescape(l.group(1)).strip() if l else "", lid))
+            rows.append(("https://offerup.com/item/detail/" + x["listingId"], (x.get("title") or "").strip(), x.get("locationName") or "", lid, "ou"))
         time.sleep(2)
+
+def src_trashnothing(seen, rows):
+    for a in CFG.get("trashnothing", []):
+        pg = get(f"https://trashnothing.com/beta/browse?latitude={a['lat']}&longitude={a['lon']}&radius={a['radius_m']}&types=offer")
+        for m in re.finditer(r'<a href="(/post/(\d+)/[^"]*)"[^>]*class="[^"]*post-list-item offer[^"]*">.*?<span class="post-title">(.*?)</span>\s*<!', pg, re.S):
+            lid = "tn-" + m.group(2)
+            if lid in seen: continue
+            seen.add(lid)
+            full = re.sub(r"\s+", " ", html.unescape(re.sub(r"<span.*?</span>", "", m.group(3), flags=re.S))).strip()
+            loc = re.search(r"\(([^()]*)\)\s*$", full)
+            rows.append(("https://trashnothing.com" + m.group(1), re.sub(r"\s*\([^()]*\)\s*$", "", full), loc.group(1) if loc else "", lid, "tn"))
+        time.sleep(2)
+
+SOURCES = {"craigslist": src_craigslist, "offerup": src_offerup, "trashnothing": src_trashnothing}
+
+def live_rows(status):
+    rows, seen = [], set(); status["sources"] = {}
+    for name, fn in SOURCES.items():
+        n = len(rows)
+        try: fn(seen, rows); status["sources"][name] = len(rows) - n
+        except Exception as e: status["sources"][name] = "failed: " + str(e)[:80]
     return rows
 
 def main():
@@ -71,19 +132,19 @@ def main():
             for ln in open(seed):
                 if "|" not in ln: continue
                 p, t, h = [x.strip() for x in ln.rstrip("\n").split("|", 2)]
-                rows.append(("https://www.craigslist.org/view/d/" + p, t, h, p.split("/")[-1]))
+                rows.append(("https://www.craigslist.org/view/d/" + p, t, h, p.split("/")[-1], "cl"))
         else:
-            rows = live_rows()
+            rows = live_rows(status)
             if len(rows) < 20: raise RuntimeError(f"only {len(rows)} listings parsed")
     except Exception as e:
         status.update(ok=False, error=str(e)[:200]); json.dump(status, open("status.json", "w")); print("SCAN FAILED", e); return
     items, lookups = [], 0
-    for url, title, hood, lid in rows:
+    for url, title, hood, lid, src in rows:
         cat, score = classify(title)
         if cat == "skip": continue
-        it = {"id": lid, "t": title[:110], "h": hood[:60], "u": url, "c": cat, "s": score, "first": old.get(lid, {}).get("first", NOW)}
+        it = {"id": lid, "t": title[:110], "h": hood[:60], "u": url, "c": cat, "s": score, "src": src, "first": old.get(lid, {}).get("first", NOW)}
         ex = exact.get(lid)
-        if not ex and not seed and score >= 3 and lookups < CFG.get("max_detail_lookups", 25):
+        if not ex and not seed and src == "cl" and score >= 3 and lookups < CFG.get("max_detail_lookups", 25):
             lookups += 1
             try:   # one polite look at the posting for its map pin and post date
                 pg = get(url); time.sleep(2)
@@ -96,7 +157,7 @@ def main():
             for k in ("posted", "n", "s"):
                 if ex.get(k): it[k] = ex[k]
         else:
-            g = area_geo(url.replace("https://", ""), hood, lid)
+            g = (area_geo(url.replace("https://", ""), hood, lid) if src == "cl" else None) or geo_text(hood, lid)
             if not g: continue
             it.update(la=g[0], lo=g[1], px="area")
         items.append(it)
