@@ -1,13 +1,48 @@
 {
   "scans": [
-    {"site": "tampa", "lat": 27.95, "lon": -82.46, "miles": 40},
-    {"site": "lakeland", "lat": 28.04, "lon": -81.95, "miles": 25}
+    {
+      "site": "tampa",
+      "lat": 27.95,
+      "lon": -82.46,
+      "miles": 40
+    },
+    {
+      "site": "lakeland",
+      "lat": 28.04,
+      "lon": -81.95,
+      "miles": 25
+    }
   ],
-  "cl_queries": ["curb alert", "scrap", "free"],
-  "offerup_zips": ["33602", "33801", "33710"],
+  "cl_queries": [
+    "curb alert",
+    "scrap",
+    "free"
+  ],
+  "offerup_zips": [
+    "33602",
+    "33801",
+    "33710"
+  ],
   "trashnothing": [
-    {"lat": 27.95, "lon": -82.46, "radius_m": 60000},
-    {"lat": 28.04, "lon": -81.95, "radius_m": 40000}
+    {
+      "lat": 27.95,
+      "lon": -82.46,
+      "radius_m": 60000
+    },
+    {
+      "lat": 28.04,
+      "lon": -81.95,
+      "radius_m": 40000
+    }
   ],
-  "max_detail_lookups": 25
+  "max_detail_lookups": 25,
+  "scrap_prices": {
+    "steel": 0.08,
+    "copper": 3.25,
+    "aluminum": 0.55,
+    "stainless": 0.35,
+    "ewaste": 0.15
+  },
+  "estimate_model": "qwen3.5:9b",
+  "max_estimates_per_run": 60
 }
