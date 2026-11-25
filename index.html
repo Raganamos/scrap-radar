@@ -28,6 +28,10 @@ button.on,button.go{background:var(--go);color:#04130a;border-color:var(--go);fo
 .acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.acts a,.acts button{flex:1;text-align:center;text-decoration:none;color:var(--tx);background:#1b251f;border:1px solid var(--line);border-radius:8px;padding:8px 6px;font-size:13px;min-height:38px}
 .acts button.add{background:var(--go);color:#04130a;font-weight:600;border-color:var(--go)}
 .tag{display:inline-block;font:600 10.5px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border-radius:4px;background:#1f2b24;color:var(--mut);margin-right:5px}
+.thumb{float:left;width:64px;height:64px;object-fit:cover;border-radius:8px;margin-right:10px;background:#1b251f}
+.val{font-size:13px;margin:5px 0;clear:none}.val b{color:var(--go)}.neg{color:var(--hot)}.card::after{content:"";display:block;clear:both}
+input{background:#1b251f;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-height:40px;min-width:0}
+#set{display:none}#set label{font-size:13px;color:var(--mut);display:flex;align-items:center;gap:6px}#set input{width:80px}
 .empty{color:var(--mut);text-align:center;padding:30px 10px}
 .me{width:16px;height:16px;border-radius:50%;background:var(--me);border:3px solid #fff;animation:p 2s infinite}
 .num{background:var(--go);color:#04130a;font:700 12px ui-monospace,monospace;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:2px solid #04130a}
@@ -41,7 +45,14 @@ button.on,button.go{background:var(--go);color:#04130a;border-color:var(--go);fo
   <select id="rad" aria-label="Range"><option value="2">2 mi</option><option value="5">5 mi</option><option value="10" selected>10 mi</option><option value="25">25 mi</option><option value="999">Any distance</option></select>
   <select id="min" aria-label="Minimum value"><option value="5">Top value only</option><option value="4" selected>Good and up</option><option value="3">Include materials</option><option value="1">Everything</option></select>
   <select id="src" aria-label="Source"><option value="">All sources</option><option value="cl">Craigslist</option><option value="ou">OfferUp</option><option value="tn">Trash Nothing</option></select>
-  <button id="voice">Voice alerts off</button><button id="recenter">Center on me</button>
+  <select id="sort" aria-label="Sort"><option value="near">Nearest first</option><option value="net">Best payoff first</option><option value="new">Newest first</option></select>
+  <input id="q" type="search" placeholder="Search" aria-label="Search listings" style="flex:1">
+  <button id="voice">Voice alerts off</button><button id="recenter">Center on me</button><button id="setbtn">Settings</button>
+</div>
+<div class="bar" id="set">
+  <label>Truck mpg <input id="mpg" type="number" inputmode="decimal" step="0.5" min="1"></label>
+  <label>Gas $/gal <input id="gas" type="number" inputmode="decimal" step="0.05" min="0"></label>
+  <button id="showhidden">Unhide everything</button><button id="resethaul">Reset haul tally</button>
 </div>
 <div id="run">
   <h2>My pickup run</h2>
@@ -60,6 +71,8 @@ const SRC={cl:'Craigslist',ou:'OfferUp',tn:'Trash Nothing',fb:'Facebook',nd:'Nex
 let items=[],me=null,meManual=false,voice=false,scanned=null,statusOk=true,follow=true;
 let hidden=new Set(LS('sr_hidden')||[]),run=LS('sr_run')||[],seen=new Set(LS('sr_seen')||[]),announced=new Set(),home=LS('sr_home');
 const firstRun=!LS('sr_seen');
+let cfg=Object.assign({mpg:15,gas:3.1,rad:'10',min:'4',sort:'near'},LS('sr_cfg')||{}),haul=LS('sr_haul')||[];
+const trip=mi=>mi*1.3/cfg.mpg*cfg.gas, money=n=>'$'+Math.round(n).toLocaleString();
 function dist(a,b,c,d){const x=rad(d-b)*Math.cos(rad((a+c)/2)),y=rad(c-a);return Math.sqrt(x*x+y*y)*R}
 function bearing(a,b,c,d){const y=Math.sin(rad(d-b))*Math.cos(rad(c)),x=Math.cos(rad(a))*Math.sin(rad(c))-Math.sin(rad(a))*Math.cos(rad(c))*Math.cos(rad(d-b));return ['N','NE','E','SE','S','SW','W','NW'][Math.round(((Math.atan2(y,x)*180/Math.PI)+360)%360/45)%8]}
 const map=L.map('map',{zoomControl:false}).setView([27.95,-82.3],9);
@@ -73,12 +86,21 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function plan(start,stops,end){
   if(!stops.length)return{order:[],miles:0};
   const P=[start,...stops],n=P.length,D=(i,j)=>dist(P[i].la,P[i].lo,P[j].la,P[j].lo);
-  let ord=[0],left=new Set([...Array(n).keys()].slice(1));
-  while(left.size){const c=ord[ord.length-1];let b=null;left.forEach(j=>{if(b===null||D(c,j)<D(c,b))b=j});ord.push(b);left.delete(b)}
   const tail=o=>end?dist(P[o[o.length-1]].la,P[o[o.length-1]].lo,end.la,end.lo):0;
   const len=o=>{let t=0;for(let i=0;i<o.length-1;i++)t+=D(o[i],o[i+1]);return t+tail(o)};
-  let best=len(ord),improved=true;
-  while(improved){improved=false;for(let i=1;i<n-1;i++)for(let k=i+1;k<n;k++){const c=ord.slice(0,i).concat(ord.slice(i,k+1).reverse(),ord.slice(k+1)),l=len(c);if(l<best-1e-9){ord=c;best=l;improved=true}}}
+  let ord,best=Infinity;
+  if(n<=9){ // few stops: try every order, so the answer is the true shortest
+    const go=(cur,rest,l)=>{if(l>=best)return;if(!rest.length){const t=l+tail(cur);if(t<best){best=t;ord=cur.slice()}return}
+      for(let i=0;i<rest.length;i++){const j=rest[i];cur.push(j);go(cur,rest.filter((_,k)=>k!==i),l+D(cur[cur.length-2],j));cur.pop()}};
+    go([0],[...Array(n).keys()].slice(1),0);
+  }else{ // many stops: nearest-neighbour, then keep swapping and moving stops while it gets shorter
+    ord=[0];const left=new Set([...Array(n).keys()].slice(1));
+    while(left.size){const c=ord[ord.length-1];let b=null;left.forEach(j=>{if(b===null||D(c,j)<D(c,b))b=j});ord.push(b);left.delete(b)}
+    best=len(ord);let improved=true;
+    while(improved){improved=false;
+      for(let i=1;i<n-1;i++)for(let k=i+1;k<n;k++){const c=ord.slice(0,i).concat(ord.slice(i,k+1).reverse(),ord.slice(k+1)),l=len(c);if(l<best-1e-9){ord=c;best=l;improved=true}}
+      for(let i=1;i<n;i++)for(let k=1;k<n;k++){if(i===k)continue;const c=ord.slice();const[x]=c.splice(i,1);c.splice(k,0,x);const l=len(c);if(l<best-1e-9){ord=c;best=l;improved=true}}}
+  }
   return{order:ord.slice(1).map(i=>stops[i-1]),miles:best};
 }
 function renderRun(){
@@ -89,28 +111,30 @@ function renderRun(){
   L.polyline(path,{color:'#4ade80',weight:4,opacity:.8}).addTo(runLayer);
   p.order.forEach((s,i)=>L.marker([s.la,s.lo],{icon:L.divIcon({className:'',html:`<div class="num">${i+1}</div>`,iconSize:[22,22],iconAnchor:[11,11]}),zIndexOffset:900}).addTo(runLayer).bindPopup(esc(s.t)));
   let prev=start;$('stops').innerHTML=p.order.map(s=>{const leg=dist(prev.la,prev.lo,s.la,s.lo);prev=s;return `<li>${esc(s.t)} <span style="color:var(--mut)">· ${esc(s.h)} · ${leg.toFixed(1)} mi leg</span></li>`}).join('');
-  const drive=p.miles*1.3;
-  $('sum').textContent=`${p.order.length} stops · about ${drive.toFixed(0)} road miles (${p.miles.toFixed(0)} straight-line)${mode==='home'&&!home?' · home not set yet, tap "Set home = here" when you are there':''}${me?'':' · no GPS yet, starting from the first stop'}${p.order.length>9?' · Google Maps takes 9 stops at a time; the link covers the first 9':''}`;
+  const drive=p.miles*1.3,worth=p.order.reduce((a,s)=>a+((s.v&&s.v.best)||0),0),fuel=drive/cfg.mpg*cfg.gas;
+  $('sum').textContent=`${p.order.length} stops · about ${drive.toFixed(0)} road miles (${p.miles.toFixed(0)} straight-line) · worth at least about ${money(worth)}, gas about ${money(fuel)}, net about ${money(worth-fuel)}${mode==='home'&&!home?' · home not set yet, tap "Set home = here" when you are there':''}${me?'':' · no GPS yet, starting from the first stop'}${p.order.length>9?' · Google Maps takes 9 stops at a time; the link covers the first 9':''}`;
   const o=p.order.slice(0,9),dest=end||o[o.length-1],way=(end?o:o.slice(0,-1)).map(s=>s.la+','+s.lo).join('|');
   $('gmaps').href=`https://www.google.com/maps/dir/?api=1${me?`&origin=${me.la},${me.lo}`:''}&destination=${dest.la},${dest.lo}${way?'&waypoints='+encodeURIComponent(way):''}&travelmode=driving`;
 }
 function render(){
-  const r=+$('rad').value,min=+$('min').value,src=$('src').value;
-  let rows=items.filter(i=>!hidden.has(i.id)&&(run.includes(i.id)||(i.s>=min&&(!src||i.src===src)))).map(i=>({...i,dm:me?dist(me.la,me.lo,i.la,i.lo):null}));
+  const r=+$('rad').value,min=+$('min').value,src=$('src').value,q=$('q').value.trim().toLowerCase(),sort=$('sort').value;
+  let rows=items.filter(i=>!hidden.has(i.id)&&(run.includes(i.id)||(i.s>=min&&(!src||i.src===src)&&(!q||(i.t+' '+i.h).toLowerCase().includes(q))))).map(i=>{const dm=me?dist(me.la,me.lo,i.la,i.lo):null,best=(i.v&&i.v.best)||0,fuel=dm==null?0:trip(dm*2);return{...i,dm,fuel,net:best-fuel}});
   if(me)rows=rows.filter(i=>i.dm<=r||run.includes(i.id));
-  rows.sort((a,b)=>me?a.dm-b.dm:b.s-a.s);
+  const when=i=>new Date(i.posted||i.first||0).getTime();
+  rows.sort(sort==='net'?(a,b)=>b.net-a.net:sort==='new'?(a,b)=>when(b)-when(a):(a,b)=>me?a.dm-b.dm:b.s-a.s);
   pins.clearLayers();
   rows.forEach(i=>L.circleMarker([i.la,i.lo],{radius:i.px==='exact'?8:6,color:color(i.s),weight:2,fillOpacity:i.px==='exact'?.85:.35,dashArray:i.px==='exact'?null:'3'}).addTo(pins)
     .bindPopup(`<b>${esc(i.t)}</b><br>${esc(i.h)}<br><a href="${i.u}" target="_blank" rel="noopener">Open listing</a>`));
   if(ring){ring.remove();ring=null}
   if(me&&r<900)ring=L.circle([me.la,me.lo],{radius:r*1609.34,color:'#4ade80',weight:1,fillOpacity:.05}).addTo(map);
   $('list').innerHTML=rows.length?rows.map(i=>{const isNew=!firstRun&&!seen.has(i.id),inRun=run.includes(i.id);
-    return `<div class="card s${i.s}${isNew?' new':''}${inRun?' in':''}">${i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}</div>`:''}<div class="t">${esc(i.t)}</div>
+    return `<div class="card s${i.s}${isNew?' new':''}${inRun?' in':''}">${i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}</div>`:''}${i.img?`<img class="thumb" loading="lazy" alt="" src="${esc(i.img)}">`:''}<div class="t">${esc(i.t)}</div>
     <div class="m"><span class="tag">${i.c}</span><span class="tag">${SRC[i.src]||'Craigslist'}</span>${isNew?'<span class="tag" style="color:#4ade80">new</span>':''}${esc(i.h)} · ${i.px==='exact'?'pin exact':'pin approximate'}${i.posted?' · posted '+age(i.posted):''}</div>
     ${i.n?`<div class="n">${esc(i.n)}</div>`:''}
-    <div class="acts"><button class="${inRun?'':'add'}" data-run="${i.id}">${inRun?'Remove from run':'Add to run'}</button><a href="https://www.google.com/maps/dir/?api=1&destination=${i.la},${i.lo}" target="_blank" rel="noopener">Navigate</a><a href="${i.u}" target="_blank" rel="noopener">Listing</a><button data-hide="${i.id}">Hide</button></div></div>`}).join('')
+    ${i.v?`<div class="val">${i.v.rh?`Resale about <b>${money(i.v.rl)}–${money(i.v.rh)}</b>`:''}${i.v.rh&&i.v.sc?' · ':''}${i.v.sc?`Scrap about <b>${money(i.v.sc)}</b> (${i.v.w} lb ${i.v.m})`:''}${!i.v.rh&&!i.v.sc?'No clear value from the title':''}${i.dm!=null&&i.v.best?` · gas ${money(i.fuel)} round trip → <b class="${i.net<0?'neg':''}">net ${i.net<0?'-':''}${money(Math.abs(i.net))}</b>`:''}<br><span style="color:var(--mut);font-size:12px">${i.v.by==='ai'?'AI estimate from the title':'Rule-of-thumb weight'} · ${i.v.cf} confidence${i.v.why?' · '+esc(i.v.why):''}</span></div>`:''}
+    <div class="acts"><button class="${inRun?'':'add'}" data-run="${i.id}">${inRun?'Remove from run':'Add to run'}</button><a href="https://www.google.com/maps/dir/?api=1&destination=${i.la},${i.lo}" target="_blank" rel="noopener">Navigate</a><a href="${i.u}" target="_blank" rel="noopener">Listing</a><button data-got="${i.id}">Got it</button><button data-hide="${i.id}">Gone / skip</button></div></div>`}).join('')
     :`<div class="empty">${me?'Nothing in range at this value level. Widen the range or lower the value filter.':'Waiting for GPS. Tap the map to set your position by hand.'}</div>`;
-  $('stat').innerHTML=`${rows.length} shown / ${items.length} tracked<br>${me?(meManual?'position set by hand':'GPS live'):'no position yet'} · scan ${scanned?age(scanned):'?'}${statusOk?'':' · <span style="color:#fbbf24">last scan failed</span>'}`;
+  $('stat').innerHTML=`${rows.length} shown / ${items.length} tracked${haul.length?` · haul: ${haul.length} items, about ${money(haul.reduce((a,h)=>a+h.v,0))}`:''}<br>${me?(meManual?'position set by hand':'GPS live'):'no position yet'} · scan ${scanned?age(scanned):'?'}${statusOk?'':' · <span style="color:#fbbf24">last scan failed</span>'}`;
   if(me&&!meManual)rows.filter(i=>i.s>=4&&i.dm<=Math.min(r,3)&&!announced.has(i.id)).slice(0,2).forEach(i=>{announced.add(i.id);
     try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
     if(voice&&window.speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance(`${i.t}, ${i.dm.toFixed(1)} miles ${bearing(me.la,me.lo,i.la,i.lo)}`))});
@@ -126,8 +150,14 @@ async function load(){try{
 }catch(e){$('stat').textContent='Could not load scan data'}}
 document.addEventListener('click',e=>{const t=e.target;
   if(t.dataset.hide){hidden.add(t.dataset.hide);run=run.filter(x=>x!==t.dataset.hide);LS('sr_hidden',[...hidden]);LS('sr_run',run);render()}
+  if(t.dataset.got){const it=items.find(i=>i.id===t.dataset.got);haul.push({id:t.dataset.got,t:it?it.t:'',v:(it&&it.v&&it.v.best)||0,at:Date.now()});LS('sr_haul',haul);hidden.add(t.dataset.got);run=run.filter(x=>x!==t.dataset.got);LS('sr_hidden',[...hidden]);LS('sr_run',run);render()}
   if(t.dataset.run){run=run.includes(t.dataset.run)?run.filter(x=>x!==t.dataset.run):[...run,t.dataset.run];LS('sr_run',run);render()}});
-$('rad').onchange=$('min').onchange=$('src').onchange=$('end').onchange=render;
+$('rad').value=cfg.rad;$('min').value=cfg.min;$('sort').value=cfg.sort;$('mpg').value=cfg.mpg;$('gas').value=cfg.gas;
+const save=()=>{cfg={mpg:+$('mpg').value||15,gas:+$('gas').value||0,rad:$('rad').value,min:$('min').value,sort:$('sort').value};LS('sr_cfg',cfg);render()};
+['rad','min','sort','mpg','gas'].forEach(k=>$(k).onchange=save);$('src').onchange=$('end').onchange=render;$('q').oninput=render;
+$('setbtn').onclick=()=>{const s=$('set');s.style.display=s.style.display==='flex'?'none':'flex'};
+$('showhidden').onclick=()=>{hidden=new Set();LS('sr_hidden',[]);render()};
+$('resethaul').onclick=()=>{haul=[];LS('sr_haul',haul);render()};
 $('clear').onclick=()=>{run=[];LS('sr_run',run);render()};
 $('sethome').onclick=()=>{if(me){home={la:me.la,lo:me.lo};LS('sr_home',home);$('sethome').textContent='Home saved';$('end').value='home';render()}};
 $('recenter').onclick=()=>{follow=true;if(me)map.setView([me.la,me.lo],Math.max(map.getZoom(),11))};
