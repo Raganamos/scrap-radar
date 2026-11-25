@@ -44,5 +44,14 @@
     "ewaste": 0.15
   },
   "estimate_model": "qwen3.5:9b",
-  "max_estimates_per_run": 60
+  "max_estimates_per_run": 60,
+  "alert_min_value": 60,
+  "call_hours": [
+    9,
+    20
+  ],
+  "max_calls_per_day": 12,
+  "retell_from_number": null,
+  "retell_voice_from_agent": "agent_825e9bad62cdb077764a8fc153",
+  "watch_every_min": 30
 }
