@@ -11,7 +11,7 @@ CFG = json.load(open("config.json"))
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
 NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-SKIP = r"mattress|sofa|couch|love ?seat|recliner|sectional|\bcats?\b|kitten|\bdog\b|puppy|rooster|chicken|hens\b|animals|mulch|manure|\bdirt\b|topsoil|eggs?\b|egg carton|dinner|meal|pantry|pick-?up and disposal|removal|wanted|we need|i need|appraisal|valuing|service needed|styrofoam|christmas|halloween|isopod|cactus|aloe|digital|greeting card|incontinence|cpap|diabetic|pillow|crushed shell|bamboo|\bshow\b|koozies|jewels of opar|mocasin"
+SKIP = r"mattress|sofa|couch|love ?seat|recliner|sectional|\bcats?\b|kitten|\bdogs?\b|pupp(y|ies)|rooster|chicken|hens\b|animals|mulch|manure|\bdirt\b|topsoil|eggs?\b|egg carton|dinner|meal|pantry|pick-?up and disposal|removal|wanted|we need|i need|appraisal|valuing|service needed|styrofoam|christmas|halloween|isopod|rabbits?|bunn(y|ies)|goats?|ducks?|parrots?|cactus|aloe|digital|greeting card|incontinence|cpap|diabetic|pillow|crushed shell|bamboo|\bshow\b|koozies|jewels of opar|mocasin"
 RULES = [  # (category, score, regex) first match wins
  ("scrap", 5, r"copper|scrap|aluminum|stainless|\bmetals?\b|punch press|cnc|truck box"),
  ("electronics", 5, r"network|switch|access point|camera|server|laptop|computer"),
@@ -25,6 +25,25 @@ RULES = [  # (category, score, regex) first match wins
 ]
 CITY = {"lakeland":(28.04,-81.95),"auburndale":(28.065,-81.789),"bartow":(27.896,-81.843),"mulberry":(27.895,-81.973),"nichols":(27.89,-82.03),"plant-city":(28.018,-82.113),"dover":(27.994,-82.22),"seffner":(27.984,-82.276),"brandon":(27.938,-82.286),"valrico":(27.938,-82.236),"riverview":(27.866,-82.326),"tampa":(27.95,-82.46),"lutz":(28.151,-82.461),"odessa":(28.194,-82.59),"land-lakes":(28.219,-82.457),"wesley-chapel":(28.24,-82.33),"zephyrhills":(28.233,-82.181),"dade-city":(28.365,-82.196),"ruskin":(27.72,-82.433),"sun-city-center":(27.718,-82.352),"wimauma":(27.712,-82.299),"saint-petersburg":(27.77,-82.66),"pinellas-park":(27.843,-82.699),"bay-pines":(27.814,-82.778),"seminole":(27.84,-82.791),"largo":(27.909,-82.787),"clearwater-beach":(27.978,-82.827),"clearwater":(27.966,-82.80),"belleair-beach":(27.92,-82.84),"dunedin":(28.02,-82.772),"palm-harbor":(28.078,-82.764),"oldsmar":(28.034,-82.665),"safety-harbor":(27.99,-82.693),"tarpon-springs":(28.146,-82.757),"holiday":(28.188,-82.74),"elfers":(28.217,-82.722),"new-port-richey":(28.244,-82.719),"port-richey":(28.272,-82.72),"hudson":(28.364,-82.693),"aripeka":(28.43,-82.66),"spring-hill":(28.477,-82.525),"brooksville":(28.555,-82.388),"palmetto":(27.521,-82.572),"ellenton":(27.522,-82.528),"bradenton-beach":(27.467,-82.70),"bradenton":(27.499,-82.575),"oneco":(27.45,-82.55),"parrish":(27.588,-82.425),"sarasota":(27.336,-82.531),"bradley":(27.80,-81.98)}
 HOOD = {"gulfport":(27.748,-82.703),"st pete beach":(27.725,-82.741),"madeira beach":(27.798,-82.797),"south pasadena":(27.755,-82.738),"coquina key":(27.737,-82.632),"maximo":(27.713,-82.683),"azalea":(27.79,-82.74),"euclid":(27.787,-82.645),"22 ave n":(27.792,-82.675),"south westshore":(27.905,-82.525),"south tampa":(27.915,-82.505),"gandy":(27.893,-82.50),"ybor":(27.96,-82.437),"seminole heights":(27.995,-82.46),"forest hills":(28.045,-82.475),"carrollwood":(28.05,-82.50),"westchase":(28.055,-82.61),"town n country":(28.01,-82.577),"tampa palms":(28.09,-82.38),"new tampa":(28.13,-82.35),"bruce b downs":(28.07,-82.39),"highland city":(27.965,-81.878),"south lakeland":(27.98,-81.96),"33810":(28.11,-82.03),"morton":(28.03,-81.955),"lakewood ranch":(27.41,-82.43),"lwr":(27.41,-82.43),"belleair":(27.935,-82.806),"east lake":(28.11,-82.69),"starkey":(28.2,-82.62)}
+
+BIZ = (r"\d{1,2}\s?%\s?off|\bon sale\b|\ball on sale|\bsale on\b|\bsale\s*:|super sale|summer\s+sale|black friday|cyber monday|dollar down|come in today|"
+       r"financ|wholesale|factory direct|warehouse (sale|event)|largest|thousands of pieces|many to choose|starting at|open floor stock|floor stock|"
+       r"\bservices\b|welding service|camera installs|installation|tv mounting|repairs?\b|specialist|handyman|remodeling|pressure washing|painting services|"
+       r"paying cash|cash (for|4)|we (will )?buy|we pay|\bbuying\b|hauled away for|\bhauling\b|junk removal|we haul|we remove|"
+       r"shop local|small business|body shop|thrift store|boutique|free shipping|buy now|best deal|grand opening|call (now|today)|appointment|"
+       r"free (estimate|quote)s?|years old\?|roof (replacement|inspection|repair)|delivered to you|delivery available|in stock|\bdealer|\bpart ?out\b|\bpartout")
+YARD = (r"(yard|garage|gsrage|estate|moving|multi-?family|community|rummage|tag|clear ?out|clearance|shutdown|liquidation|closing|warehouse|clothing|plant)\s+sale|"
+        r"sale encore|closing down|liquidate|^\W*(for ?sale|garage sale|yard sale|moving sale|everything for sale|all different things for sale)\W*$|things for sale|forsale")
+SCAM = r"^\W*(free\s+)?(iphone|ipad|macbook|airpods|apple watch|playstation 5|ps5|xbox series|nintendo switch|galaxy s2\d)\b.{0,15}$"   # 'free' flagship gadgets = scam bait
+FREEWORD = r"\bfree\b|curb|must go|come get|haul (it )?away|you haul|take it|giveaway|give away|no charge|left ?over|\$0\b"
+
+def kind(title, dupes=0):
+    """'biz' = store, dealer or service ad; 'yard' = a yard/estate sale event; '' = a real item."""
+    t = title.lower()
+    if re.search(BIZ, t) or dupes >= 3: return "biz"
+    if re.search(SCAM, t) and not re.search(r"broken|cracked|parts|not working|for parts|damaged|old|box(es)? only|case", t): return "biz"
+    if re.search(YARD, t): return "yard"
+    return ""
 
 def classify(title):
     t = title.lower()
@@ -75,14 +94,14 @@ def get(url):
     return urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
 
 PRICE = {}
-def cl_parse(page, seen, rows, free_only=False):
+def cl_parse(page, seen, rows, free_only=False, cheap=0):
     for m in re.finditer(r'<li class="cl-static-search-result"[^>]*>\s*<a href="([^"]+)">(.*?)</a>', page, re.S):
         url, body = m.group(1), m.group(2)
         t = re.search(r'class="title">(.*?)</div>', body, re.S); l = re.search(r'class="location">(.*?)</div>', body, re.S)
         p = re.search(r'class="price">\s*\$?([\d,]+)', body)
         price = int(p.group(1).replace(",", "")) if p else 0
         lid = re.sub(r"\.html$", "", url.rstrip("/").split("/")[-1])
-        if lid in seen or not t or (free_only and price > 1): continue
+        if lid in seen or not t or (free_only and price != 0) or (cheap and not 2 <= price <= cheap): continue
         seen.add(lid); PRICE[lid] = price
         rows.append((url, html.unescape(t.group(1)).strip(), html.unescape(l.group(1)).strip() if l else "", lid, "cl"))
 
@@ -94,6 +113,31 @@ def src_craigslist(seen, rows):
             try: cl_parse(get(base % "sss" + "&max_price=1" + ("&query=" + urllib.parse.quote(q) if q else "")), seen, rows, free_only=True)
             except Exception: pass
             time.sleep(2)
+
+def src_cheap(seen, rows):
+    """Cheap (not free) things worth buying to scrap or flip, up to cheap_max dollars."""
+    mx = CFG.get("cheap_max", 40)
+    for s in CFG["scans"]:
+        base = f"https://{s['site']}.craigslist.org/search/sss?lat={s['lat']}&lon={s['lon']}&search_distance={s['miles']}&min_price=2&max_price={mx}"
+        for q in CFG.get("cheap_queries", []):
+            try: cl_parse(get(base + "&query=" + urllib.parse.quote(q)), seen, rows, cheap=mx)
+            except Exception: pass
+            time.sleep(2)
+    for z, q in [(z, q) for z in CFG.get("offerup_zips", [])[:6] for q in CFG.get("cheap_queries_ou", [])]:
+        try: pg = get(f"https://offerup.com/search?q={urllib.parse.quote(q)}&price_min=1&price_max={mx}&zipcode={z}&radius=30")
+        except Exception: continue
+        try: tiles = json.loads(re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', pg, re.S).group(1))["props"]["pageProps"]["searchFeedResponse"]["looseTiles"]
+        except Exception: continue
+        for t in tiles:
+            x = t.get("listing") or {}
+            try: pr = float(x.get("price") or 0)
+            except ValueError: continue
+            lid = "ou-" + str(x.get("listingId", ""))
+            if not x.get("listingId") or not 1 <= pr <= mx or lid in seen: continue
+            seen.add(lid); PRICE[lid] = int(round(pr))
+            IMG[lid] = ((x.get("image") or {}).get("url") or "")
+            rows.append(("https://offerup.com/item/detail/" + x["listingId"], (x.get("title") or "").strip(), x.get("locationName") or "", lid, "ou"))
+        time.sleep(2)
 
 def src_offerup(seen, rows):
     for z, q in [(z, q) for z in CFG.get("offerup_zips", []) for q in CFG.get("offerup_queries", ["free"])]:
@@ -134,7 +178,7 @@ def src_browser(seen, rows):
         rows.append((r["u"], r["t"], r.get("h", ""), lid, r["src"]))
 
 IMG = {}
-SOURCES = {"craigslist": src_craigslist, "offerup": src_offerup, "trashnothing": src_trashnothing, "signed_in_sites": src_browser}
+SOURCES = {"craigslist": src_craigslist, "cheap": src_cheap, "offerup": src_offerup, "trashnothing": src_trashnothing, "signed_in_sites": src_browser}
 
 def live_rows(status):
     rows, seen = [], set(); status["sources"] = {}
@@ -254,9 +298,15 @@ def main():
     except Exception as e:
         status.update(ok=False, error=str(e)[:200]); json.dump(status, open("status.json", "w")); print("SCAN FAILED", e); return
     items, lookups = [], 0
+    norm = lambda t: re.sub(r"[^a-z]+", " ", t.lower()).strip()[:40]
+    flood = {}
+    for r in rows: flood[norm(r[1])] = flood.get(norm(r[1]), 0) + 1
+    dropped = {"biz": 0}
     for url, title, hood, lid, src in rows:
         cat, score = classify(title)
         if cat == "skip": continue
+        k = kind(title, flood.get(norm(title), 0))
+        if k == "biz": dropped["biz"] += 1; continue
         it = {"id": lid, "t": title[:110], "h": hood[:60], "u": url, "c": cat, "s": score, "src": src, "first": old.get(lid, {}).get("first", NOW)}
         ex = exact.get(lid)
         if not ex and not seed and src == "cl" and score >= 3 and lookups < CFG.get("max_detail_lookups", 25):
@@ -279,6 +329,7 @@ def main():
             it.update(la=g[0], lo=g[1], px="area")
         if IMG.get(lid): it["img"] = IMG[lid]
         if PRICE.get(lid): it["p"] = PRICE[lid]
+        if k: it["k"] = k
         items.append(it)
     live_ids = {r[3] for r in rows}
     json.dump({k: v for k, v in exact.items() if k in live_ids or seed}, open("exact.json", "w"), indent=0)
@@ -287,6 +338,8 @@ def main():
     status["ai_backlog"] = sum(1 for i in items if i["s"] >= 3 and (i.get("v") or {}).get("by") != "ai")
     try: status["signed_in"] = json.load(open("browser_rows.json", encoding="utf-8")).get("status", {})
     except Exception: pass
+    status["dropped_ads"] = dropped["biz"]
+    status["by_price"] = {"free": sum(1 for i in items if not i.get("p")), "cheap": sum(1 for i in items if i.get("p"))}
     status["by_source"] = {k: sum(1 for i in items if i.get("src") == k) for k in ("cl", "ou", "tn", "fb", "nd")}
     json.dump({"scanned": NOW, "count": len(items), "prices": PRICES, "items": items}, open("listings.json", "w"), separators=(",", ":"))
     status["count"] = len(items); json.dump(status, open("status.json", "w"))
