@@ -2,37 +2,48 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#0b100d">
 <title>Scrap Radar</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-:root{--bg:#0b100d;--pan:#131a15;--line:#24302a;--tx:#dfe9e1;--mut:#8a9a8e;--go:#4ade80;--warn:#fbbf24;--hot:#fb7185;--me:#38bdf8}
+:root{--bg:#0b100d;--pan:#131a15;--pan2:#1b251f;--line:#24302a;--tx:#dfe9e1;--mut:#8a9a8e;--go:#4ade80;--warn:#fbbf24;--hot:#fb7185;--me:#38bdf8;--srch:#a78bfa}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,sans-serif}
-header{padding:8px 12px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:1px solid var(--line)}
+header{padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
 h1{font:700 15px ui-monospace,monospace;letter-spacing:.15em;margin:0;color:var(--go)}
-#stat{font-size:12px;color:var(--mut);text-align:right}
-#map{height:44vh;min-height:250px;background:#0e1511}
+#stat{font-size:12px;color:var(--mut);text-align:right}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#555;margin-right:4px;vertical-align:middle}.dot.on{background:var(--go)}
+#map{height:40vh;min-height:230px;background:#0e1511}
+nav{display:flex;border-bottom:1px solid var(--line);background:var(--pan);position:sticky;top:0;z-index:600}
+nav button{flex:1;border:0;border-radius:0;background:none;color:var(--mut);padding:10px 4px;font:600 13.5px system-ui;min-height:44px;border-bottom:3px solid transparent}
+nav button.on{color:var(--go);border-bottom-color:var(--go)}
 .bar{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;background:var(--pan);border-bottom:1px solid var(--line)}
-.bar.top{position:sticky;top:0;z-index:500}
-button,select{background:#1b251f;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-height:40px}
-button.on,button.go{background:var(--go);color:#04130a;border-color:var(--go);font-weight:600}
+button,select,input,textarea{background:var(--pan2);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-height:40px;min-width:0}
+button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;border-color:var(--go);font-weight:600}button:disabled{opacity:.45}
+.panel{display:none}.panel.show{display:block}
+.links{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 8px;background:var(--pan);border-bottom:1px solid var(--line)}
+.links span{font-size:12.5px;color:var(--mut);width:100%}
+.links a{font-size:13px;color:var(--tx);background:var(--pan2);border:1px solid var(--line);border-radius:14px;padding:5px 10px;text-decoration:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:12.5px;padding:5px 10px;border-radius:14px;min-height:32px}.chip.off{opacity:.4;text-decoration:line-through}
 #run{display:none;padding:10px;background:#101c14;border-bottom:1px solid var(--go)}
-#run h2{font-size:14px;margin:0 0 6px;color:var(--go)}#run ol{margin:6px 0;padding-left:22px}#run li{margin:3px 0;font-size:13.5px}
-#run .sum{font-size:13px;color:var(--mut);margin:4px 0}
-#list{padding:8px 10px 60px;display:grid;gap:8px;max-width:760px;margin:auto}
+#run h2,.sec h2{font-size:14px;margin:0 0 6px;color:var(--go)}#run ol{margin:6px 0;padding-left:22px}#run li{margin:3px 0;font-size:13.5px}
+.sum{font-size:13px;color:var(--mut);margin:4px 0}
+#set{padding:10px;background:var(--pan);border-bottom:1px solid var(--line);display:none}#set.show{display:block}
+#set label{font-size:13px;color:var(--mut);display:flex;align-items:center;gap:6px;margin:6px 0}#set .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+#list{padding:8px 10px 70px;display:grid;gap:8px;max-width:760px;margin:auto}
 .card{background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:10px 12px;border-left:4px solid var(--line)}
 .card.s5{border-left-color:var(--hot)}.card.s4{border-left-color:var(--warn)}.card.s3{border-left-color:var(--go)}
-.card.new{box-shadow:0 0 0 1px var(--go) inset}.card.in{background:#12241a}
+.card.new{box-shadow:0 0 0 1px var(--go) inset}.card.in{background:#12241a}.card::after{content:"";display:block;clear:both}
+.thumb{float:left;width:64px;height:64px;object-fit:cover;border-radius:8px;margin-right:10px;background:var(--pan2)}
 .t{font-weight:600}.m{font-size:12.5px;color:var(--mut);margin:3px 0}.n{font-size:13px;margin:5px 0;color:#c9d6cc}
-.d{float:right;font:700 14px ui-monospace,monospace;color:var(--go);margin-left:8px}
-.acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.acts a,.acts button{flex:1;text-align:center;text-decoration:none;color:var(--tx);background:#1b251f;border:1px solid var(--line);border-radius:8px;padding:8px 6px;font-size:13px;min-height:38px}
-.acts button.add{background:var(--go);color:#04130a;font-weight:600;border-color:var(--go)}
+.d{float:right;text-align:right;font:700 14px ui-monospace,monospace;color:var(--go);margin-left:8px}.d small{display:block;font:500 11.5px system-ui;color:var(--mut)}
+.val{font-size:13px;margin:5px 0}.val b{color:var(--go)}.neg{color:var(--hot)!important}
+.callres{font-size:13px;margin:6px 0;padding:7px 9px;border-radius:8px;background:#0f1d16;border:1px solid var(--line)}.callres b{color:var(--go)}
+.acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.acts a,.acts button{flex:1 1 auto;text-align:center;text-decoration:none;color:var(--tx);background:var(--pan2);border:1px solid var(--line);border-radius:8px;padding:8px 6px;font-size:13px;min-height:38px}
+.acts .add{background:var(--go);color:#04130a;font-weight:600;border-color:var(--go)}
 .tag{display:inline-block;font:600 10.5px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border-radius:4px;background:#1f2b24;color:var(--mut);margin-right:5px}
-.thumb{float:left;width:64px;height:64px;object-fit:cover;border-radius:8px;margin-right:10px;background:#1b251f}
-.val{font-size:13px;margin:5px 0;clear:none}.val b{color:var(--go)}.neg{color:var(--hot)}.card::after{content:"";display:block;clear:both}
-input{background:#1b251f;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-height:40px;min-width:0}
-#set{display:none}#set label{font-size:13px;color:var(--mut);display:flex;align-items:center;gap:6px}#set input{width:80px}
-.empty{color:var(--mut);text-align:center;padding:30px 10px}
+.empty{color:var(--mut);text-align:center;padding:24px 10px}
+.watch{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0f2a1b;border:1px solid var(--go);color:var(--tx);padding:10px 14px;border-radius:10px;font-size:14px;z-index:2000;max-width:92vw;display:none}
 .me{width:16px;height:16px;border-radius:50%;background:var(--me);border:3px solid #fff;animation:p 2s infinite}
 .num{background:var(--go);color:#04130a;font:700 12px ui-monospace,monospace;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:2px solid #04130a}
 @keyframes p{0%{box-shadow:0 0 0 0 #38bdf8aa}100%{box-shadow:0 0 0 18px #38bdf800}}
@@ -41,19 +52,37 @@ input{background:#1b251f;color:var(--tx);border:1px solid var(--line);border-rad
 </style></head><body>
 <header><h1>SCRAP RADAR</h1><div id="stat">starting…</div></header>
 <div id="map"></div>
-<div class="bar top">
+<nav><button data-mode="radar" class="on">Radar</button><button data-mode="search">Search</button><button data-mode="watches">Watches</button><button data-mode="calls">Calls</button><button id="setbtn" aria-label="Settings" style="flex:0 0 52px">⚙︎</button></nav>
+
+<div id="set">
+  <div class="row"><b style="font-size:13px">PC link:</b><span id="linkstate" style="font-size:13px;color:var(--mut)"></span><button id="ping">Check PC</button><button id="unlink">Unlink</button></div>
+  <div class="row" id="alertrow" style="display:none"><span style="font-size:13px;color:var(--mut)">Phone alerts: install the free <b>ntfy</b> app, then</span><a id="alertlink" class="chip" style="background:var(--go);color:#04130a;text-decoration:none;font-weight:600">Subscribe in ntfy</a><button id="copytopic" class="chip">Copy topic</button></div>
+  <div class="row"><label>Truck mpg <input id="mpg" type="number" inputmode="decimal" step="0.5" min="1" style="width:80px"></label><label>Gas $/gal <input id="gas" type="number" inputmode="decimal" step="0.05" min="0" style="width:80px"></label></div>
+  <div style="font-size:13px;color:var(--mut);margin-top:6px">Show these kinds of listings (tap to switch off):</div>
+  <div class="chips" id="cats" style="margin:6px 0"></div>
+  <label style="display:block">Never show listings with these words (comma separated)<textarea id="block" rows="2" style="width:100%;margin-top:4px" placeholder="mattress, couch, crib"></textarea></label>
+  <div class="row"><button id="showhidden">Unhide everything</button><button id="resethaul">Reset haul tally</button></div>
+</div>
+
+<div class="panel show" id="p-radar"><div class="bar">
   <select id="rad" aria-label="Range"><option value="2">2 mi</option><option value="5">5 mi</option><option value="10" selected>10 mi</option><option value="25">25 mi</option><option value="999">Any distance</option></select>
   <select id="min" aria-label="Minimum value"><option value="5">Top value only</option><option value="4" selected>Good and up</option><option value="3">Include materials</option><option value="1">Everything</option></select>
   <select id="src" aria-label="Source"><option value="">All sources</option><option value="cl">Craigslist</option><option value="ou">OfferUp</option><option value="tn">Trash Nothing</option></select>
-  <select id="sort" aria-label="Sort"><option value="near">Nearest first</option><option value="net">Best payoff first</option><option value="new">Newest first</option></select>
-  <input id="q" type="search" placeholder="Search" aria-label="Search listings" style="flex:1">
-  <button id="voice">Voice alerts off</button><button id="recenter">Center on me</button><button id="setbtn">Settings</button>
-</div>
-<div class="bar" id="set">
-  <label>Truck mpg <input id="mpg" type="number" inputmode="decimal" step="0.5" min="1"></label>
-  <label>Gas $/gal <input id="gas" type="number" inputmode="decimal" step="0.05" min="0"></label>
-  <button id="showhidden">Unhide everything</button><button id="resethaul">Reset haul tally</button>
-</div>
+  <select id="sort" aria-label="Sort"><option value="near">Nearest first</option><option value="net">Best payoff first</option><option value="val">Highest value first</option><option value="new">Newest first</option></select>
+  <input id="q" type="search" placeholder="Filter these" aria-label="Filter listings" style="flex:1 1 120px">
+  <button id="rescan" disabled>Scan now</button><button id="voice">Voice alerts off</button><button id="recenter">Center on me</button>
+</div></div>
+
+<div class="panel" id="p-search"><div class="bar">
+  <input id="sq" type="search" placeholder="Search anything nearby: lawn mower, copper, PS5…" aria-label="Search for" style="flex:1 1 100%">
+  <select id="smax" aria-label="Price"><option value="0">Free only</option><option value="25">Up to $25</option><option value="50">Up to $50</option><option value="100" selected>Up to $100</option><option value="250">Up to $250</option><option value="500">Up to $500</option><option value="any">Any price</option></select>
+  <select id="srad" aria-label="Search range"><option value="5">5 mi</option><option value="10">10 mi</option><option value="25" selected>25 mi</option><option value="50">50 mi</option></select>
+  <button id="sgo" class="go">Scan with my PC</button><button id="swatch">Watch this search</button>
+</div><div class="links" id="slinks"><span>Or open this search on each site (uses your sign-ins there):</span></div></div>
+
+<div class="panel" id="p-watches"><div class="bar" style="font-size:13px;color:var(--mut)">Your PC re-runs each watch every 30 minutes and alerts you about new matches. Add one from the Search tab.</div></div>
+<div class="panel" id="p-calls"><div class="bar" style="font-size:13px;color:var(--mut)">"Check availability" has a Net Hero agent call the seller when the listing shows a phone number; otherwise you get a ready-to-send message.</div></div>
+
 <div id="run">
   <h2>My pickup run</h2>
   <div class="bar" style="padding:0;background:none;border:0">
@@ -61,110 +90,216 @@ input{background:#1b251f;color:var(--tx);border:1px solid var(--line);border-rad
     <button id="sethome">Set home = here</button><button id="clear">Clear run</button>
   </div>
   <ol id="stops"></ol><div class="sum" id="sum"></div>
-  <div class="acts"><a class="go" id="gmaps" target="_blank" rel="noopener" style="background:var(--go);color:#04130a;font-weight:600">Drive this route in Google Maps</a></div>
+  <div class="acts"><a id="gmaps" target="_blank" rel="noopener" class="add">Drive this route in Google Maps</a></div>
 </div>
-<div id="list"></div>
+<div id="list"></div><div class="toast" id="toast"></div>
 <script>
 const $=id=>document.getElementById(id), R=3958.8, rad=x=>x*Math.PI/180;
 const LS=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||'null');localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
 const SRC={cl:'Craigslist',ou:'OfferUp',tn:'Trash Nothing',fb:'Facebook',nd:'Nextdoor'};
-let items=[],me=null,meManual=false,voice=false,scanned=null,statusOk=true,follow=true;
+const CATS=['scrap','electronics','appliance','vehicle','resale','materials','furniture','curb','other'];
+let items=[],me=null,meManual=false,voice=false,scanned=null,statusOk=true,follow=true,mode='radar';
 let hidden=new Set(LS('sr_hidden')||[]),run=LS('sr_run')||[],seen=new Set(LS('sr_seen')||[]),announced=new Set(),home=LS('sr_home');
+let runItems=LS('sr_runitems')||{},search=LS('sr_search')||null,watchList=LS('sr_watches')||[],hits=LS('sr_hits')||[],calls=LS('sr_calls')||{},pc=LS('sr_pc')||null;
 const firstRun=!LS('sr_seen');
-let cfg=Object.assign({mpg:15,gas:3.1,rad:'10',min:'4',sort:'near'},LS('sr_cfg')||{}),haul=LS('sr_haul')||[];
+let cfg=Object.assign({mpg:15,gas:3.1,rad:'10',min:'4',sort:'near',off:[],block:''},LS('sr_cfg')||{}),haul=LS('sr_haul')||[];
 const trip=mi=>mi*1.3/cfg.mpg*cfg.gas, money=n=>'$'+Math.round(n).toLocaleString();
 function dist(a,b,c,d){const x=rad(d-b)*Math.cos(rad((a+c)/2)),y=rad(c-a);return Math.sqrt(x*x+y*y)*R}
 function bearing(a,b,c,d){const y=Math.sin(rad(d-b))*Math.cos(rad(c)),x=Math.cos(rad(a))*Math.sin(rad(c))-Math.sin(rad(a))*Math.cos(rad(c))*Math.cos(rad(d-b));return ['N','NE','E','SE','S','SW','W','NW'][Math.round(((Math.atan2(y,x)*180/Math.PI)+360)%360/45)%8]}
+function age(iso){if(!iso)return'';const h=(Date.now()-new Date(iso))/36e5;return h<1?Math.max(1,Math.round(h*60))+' min ago':h<48?Math.round(h)+' h ago':Math.round(h/24)+' d ago'}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function toast(t,ms=3500){const el=$('toast');el.textContent=t;el.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>el.style.display='none',ms)}
 const map=L.map('map',{zoomControl:false}).setView([27.95,-82.3],9);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
 const pins=L.layerGroup().addTo(map),runLayer=L.layerGroup().addTo(map);let meMark=null,ring=null;
 map.on('dragstart',()=>follow=false);
 const color=s=>s>=5?'#fb7185':s>=4?'#fbbf24':s>=3?'#4ade80':'#6b7a70';
-function age(iso){if(!iso)return'';const h=(Date.now()-new Date(iso))/36e5;return h<1?Math.max(1,Math.round(h*60))+' min ago':h<48?Math.round(h)+' h ago':Math.round(h/24)+' d ago'}
-function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-// ---- route planning: shortest order through the chosen stops (nearest-neighbour start, then 2-opt improvement)
+
+/* ---------- encrypted link to the PC (over ntfy.sh) ---------- */
+let link=null,es=null;const parts={};
+const enc=new TextEncoder(),dec=new TextDecoder();
+const b64e=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const b64d=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
+const hex=b=>[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+async function setupLink(){
+  const m=location.hash.match(/^#pair=(.+)$/);if(m){LS('sr_pair',decodeURIComponent(m[1]));history.replaceState(null,'',location.pathname);toast('Linked to your PC')}
+  const sec=LS('sr_pair');if(!sec||!window.crypto||!crypto.subtle){updateLinkUI();return}
+  const kraw=new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode('scrap-radar:'+sec)));
+  const th=await crypto.subtle.digest('SHA-256',new Uint8Array([...kraw,...enc.encode('topic')]));
+  const base='sr'+hex(th).slice(0,20);
+  link={K:await crypto.subtle.importKey('raw',kraw,'AES-GCM',false,['encrypt','decrypt']),cmd:base+'-cmd',out:base+'-out',alerts:base+'-alerts'};
+  listen();send({c:'ping'});updateLinkUI();
+}
+async function seal(obj){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:enc.encode('j')},link.K,enc.encode(JSON.stringify(obj)));return 'j'+b64e(new Uint8Array([...iv,...new Uint8Array(ct)]))}
+async function unseal(s){const flag=s[0],b=b64d(s.slice(1));const raw=await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12),additionalData:enc.encode(flag)},link.K,b.slice(12));
+  if(flag!=='z')return JSON.parse(dec.decode(raw));
+  const st=new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));return JSON.parse(await new Response(st).text())}
+async function send(obj){if(!link){toast('Not linked to your PC yet. Open the pairing link first.');return false}
+  obj.t=Date.now();obj.n=hex(crypto.getRandomValues(new Uint8Array(8)));
+  try{const r=await fetch('https://ntfy.sh/'+link.cmd,{method:'POST',body:await seal(obj)});return r.ok}catch(e){toast('Could not reach the relay. Check your connection.');return false}}
+function listen(){if(es)es.close();const since=LS('sr_since')||'2h';
+  es=new EventSource('https://ntfy.sh/'+link.out+'/sse?since='+encodeURIComponent(since));
+  es.onmessage=async ev=>{let d;try{d=JSON.parse(ev.data)}catch(e){return}if(d.event!=='message')return;LS('sr_since',d.id);let s=d.message||'';
+    if(s[0]==='~'){const [mid,i,n,...rest]=s.slice(1).split(':');(parts[mid]=parts[mid]||[])[+i]=rest.join(':');if(parts[mid].filter(Boolean).length<+n)return;s=parts[mid].join('');delete parts[mid]}
+    if(s[0]!=='j'&&s[0]!=='z')return;try{onReply(await unseal(s))}catch(e){}}}
+function onReply(o){
+  pc=Object.assign(pc||{},{last:Date.now()});
+  if(o.c==='pong'){pc=Object.assign(pc,{v:o.v,retell:o.retell,alerts:o.alerts,scan:o.scan});watchList=o.watches||[];hits=o.hits||hits;(o.calls||[]).forEach(c=>{if(!calls[c.id]||(calls[c.id].t||0)<=c.at*1000)calls[c.id]=Object.assign({},c,{t:c.at*1000})})}
+  else if(o.c==='searching'){if(search&&search.rid===o.rid){search.state='searching';}}
+  else if(o.c==='results'){if(!search||search.rid===o.rid){search=Object.assign(search||{},{rid:o.rid,q:o.q,items:o.items,phase:o.phase,errs:o.errs,state:o.phase>=2?'done':'estimating',at:Date.now()});LS('sr_search',search);if(o.phase===1)toast(o.items.length+' results for "'+o.q+'"')}}
+  else if(o.c==='watches'){watchList=o.list||[];if(o.added)toast('Watching. You will get an alert when something new matches.')}
+  else if(o.c==='watch_hits'){hits=o.items||[]}
+  else if(o.c==='check'){calls[o.id]=Object.assign({},o,{t:o.t||Date.now()});if(o.status==='done')toast('Call-ahead finished: '+({yes:'available',no:'gone',not_reached:'no answer',unsure:'unclear'}[o.available]||o.available),6000)}
+  else if(o.c==='scan_started'){toast('Your PC is scanning now…')}
+  else if(o.c==='scan_busy'){toast('A scan is already running.')}
+  else if(o.c==='scan_done'){toast('Scan finished: '+(o.count||'?')+' listings');load(true)}
+  LS('sr_pc',pc);LS('sr_watches',watchList);LS('sr_hits',hits);LS('sr_calls',calls);updateLinkUI();render()}
+function updateLinkUI(){const on=link&&pc&&pc.last&&Date.now()-pc.last<6*60e3;
+  $('linkstate').innerHTML=link?(pc&&pc.last?`<span class="dot ${on?'on':''}"></span>PC last heard ${age(new Date(pc.last).toISOString())}${pc.retell?' · Net Hero calling connected':' · Net Hero calling not connected yet'}`:'Linked; waiting for the PC to answer'):'Not linked. Open the pairing link sent to you once on this phone.';
+  $('rescan').disabled=$('sgo').disabled=$('swatch').disabled=!link;
+  if(link){$('alertrow').style.display='flex';$('alertlink').href='ntfy://ntfy.sh/'+link.alerts}}
+
+/* ---------- route planner ---------- */
 function plan(start,stops,end){
   if(!stops.length)return{order:[],miles:0};
   const P=[start,...stops],n=P.length,D=(i,j)=>dist(P[i].la,P[i].lo,P[j].la,P[j].lo);
   const tail=o=>end?dist(P[o[o.length-1]].la,P[o[o.length-1]].lo,end.la,end.lo):0;
   const len=o=>{let t=0;for(let i=0;i<o.length-1;i++)t+=D(o[i],o[i+1]);return t+tail(o)};
   let ord,best=Infinity;
-  if(n<=9){ // few stops: try every order, so the answer is the true shortest
-    const go=(cur,rest,l)=>{if(l>=best)return;if(!rest.length){const t=l+tail(cur);if(t<best){best=t;ord=cur.slice()}return}
-      for(let i=0;i<rest.length;i++){const j=rest[i];cur.push(j);go(cur,rest.filter((_,k)=>k!==i),l+D(cur[cur.length-2],j));cur.pop()}};
-    go([0],[...Array(n).keys()].slice(1),0);
-  }else{ // many stops: nearest-neighbour, then keep swapping and moving stops while it gets shorter
-    ord=[0];const left=new Set([...Array(n).keys()].slice(1));
+  if(n<=9){const go=(cur,rest,l)=>{if(l>=best)return;if(!rest.length){const t=l+tail(cur);if(t<best){best=t;ord=cur.slice()}return}
+      for(let i=0;i<rest.length;i++){const j=rest[i];cur.push(j);go(cur,rest.filter((_,k)=>k!==i),l+D(cur[cur.length-2],j));cur.pop()}};go([0],[...Array(n).keys()].slice(1),0)}
+  else{ord=[0];const left=new Set([...Array(n).keys()].slice(1));
     while(left.size){const c=ord[ord.length-1];let b=null;left.forEach(j=>{if(b===null||D(c,j)<D(c,b))b=j});ord.push(b);left.delete(b)}
     best=len(ord);let improved=true;
     while(improved){improved=false;
       for(let i=1;i<n-1;i++)for(let k=i+1;k<n;k++){const c=ord.slice(0,i).concat(ord.slice(i,k+1).reverse(),ord.slice(k+1)),l=len(c);if(l<best-1e-9){ord=c;best=l;improved=true}}
-      for(let i=1;i<n;i++)for(let k=1;k<n;k++){if(i===k)continue;const c=ord.slice();const[x]=c.splice(i,1);c.splice(k,0,x);const l=len(c);if(l<best-1e-9){ord=c;best=l;improved=true}}}
-  }
+      for(let i=1;i<n;i++)for(let k=1;k<n;k++){if(i===k)continue;const c=ord.slice();const[x]=c.splice(i,1);c.splice(k,0,x);const l=len(c);if(l<best-1e-9){ord=c;best=l;improved=true}}}}
   return{order:ord.slice(1).map(i=>stops[i-1]),miles:best};
 }
+const lookup=id=>items.find(i=>i.id===id)||(search&&search.items||[]).find(i=>i.id===id)||hits.find(i=>i.id===id)||runItems[id];
 function renderRun(){
-  runLayer.clearLayers();const stops=run.map(id=>items.find(i=>i.id===id)).filter(Boolean);
+  runLayer.clearLayers();const stops=run.map(lookup).filter(Boolean);
   $('run').style.display=stops.length?'block':'none';if(!stops.length)return;
-  const start=me||{la:stops[0].la,lo:stops[0].lo},mode=$('end').value,end=mode==='start'?start:mode==='home'?home:null;
+  const start=me||{la:stops[0].la,lo:stops[0].lo},m=$('end').value,end=m==='start'?start:m==='home'?home:null;
   const p=plan(start,stops,end),path=[[start.la,start.lo],...p.order.map(s=>[s.la,s.lo])];if(end)path.push([end.la,end.lo]);
   L.polyline(path,{color:'#4ade80',weight:4,opacity:.8}).addTo(runLayer);
   p.order.forEach((s,i)=>L.marker([s.la,s.lo],{icon:L.divIcon({className:'',html:`<div class="num">${i+1}</div>`,iconSize:[22,22],iconAnchor:[11,11]}),zIndexOffset:900}).addTo(runLayer).bindPopup(esc(s.t)));
-  let prev=start;$('stops').innerHTML=p.order.map(s=>{const leg=dist(prev.la,prev.lo,s.la,s.lo);prev=s;return `<li>${esc(s.t)} <span style="color:var(--mut)">· ${esc(s.h)} · ${leg.toFixed(1)} mi leg</span></li>`}).join('');
-  const drive=p.miles*1.3,worth=p.order.reduce((a,s)=>a+((s.v&&s.v.best)||0),0),fuel=drive/cfg.mpg*cfg.gas;
-  $('sum').textContent=`${p.order.length} stops · about ${drive.toFixed(0)} road miles (${p.miles.toFixed(0)} straight-line) · worth at least about ${money(worth)}, gas about ${money(fuel)}, net about ${money(worth-fuel)}${mode==='home'&&!home?' · home not set yet, tap "Set home = here" when you are there':''}${me?'':' · no GPS yet, starting from the first stop'}${p.order.length>9?' · Google Maps takes 9 stops at a time; the link covers the first 9':''}`;
+  let prev=start;$('stops').innerHTML=p.order.map(s=>{const leg=dist(prev.la,prev.lo,s.la,s.lo);prev=s;return `<li>${esc(s.t)} <span style="color:var(--mut)">· ${esc(s.h)} · ${leg.toFixed(1)} mi leg${s.p?' · $'+Math.round(s.p):''}</span></li>`}).join('');
+  const drive=p.miles*1.3,worth=p.order.reduce((a,s)=>a+((s.v&&s.v.best)||0),0),cost=p.order.reduce((a,s)=>a+(s.p||0),0),fuel=drive/cfg.mpg*cfg.gas;
+  $('sum').textContent=`${p.order.length} stops · about ${drive.toFixed(0)} road miles · worth about ${money(worth)}${cost?', costs '+money(cost):''}, gas about ${money(fuel)} → net about ${money(worth-cost-fuel)}${m==='home'&&!home?' · home not set: tap "Set home = here" when you are home':''}${me?'':' · no GPS yet, starting from the first stop'}${p.order.length>9?' · Google Maps takes 9 stops per link; the link covers the first 9':''}`;
   const o=p.order.slice(0,9),dest=end||o[o.length-1],way=(end?o:o.slice(0,-1)).map(s=>s.la+','+s.lo).join('|');
   $('gmaps').href=`https://www.google.com/maps/dir/?api=1${me?`&origin=${me.la},${me.lo}`:''}&destination=${dest.la},${dest.lo}${way?'&waypoints='+encodeURIComponent(way):''}&travelmode=driving`;
 }
+
+/* ---------- listing cards ---------- */
+function blockRe(){const w=cfg.block.split(',').map(s=>s.trim()).filter(Boolean).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));return w.length?new RegExp('\\b('+w.join('|')+')','i'):null}
+function enrich(i){const dm=me?dist(me.la,me.lo,i.la,i.lo):null,best=(i.v&&i.v.best)||0,fuel=dm==null?0:trip(dm*2);return{...i,dm,fuel,net:best-(i.p||0)-fuel}}
+function etaFor(i){if(i.dm==null)return'today';const t=new Date(Date.now()+(i.dm*1.3/35*60+20)*60000);t.setMinutes(Math.ceil(t.getMinutes()/15)*15,0,0);
+  if(t.getDate()!==new Date().getDate()||t.getHours()>=21)return'tomorrow morning';if(t.getHours()<8)return'later this morning';return'around '+t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
+function msgFor(i){const s=i.t.replace(/\b(free|curb alert)\b/ig,'').replace(/[*!]+/g,'').trim()||i.t;return `Hi! Is the ${s} still available? I can come pick it up ${etaFor(i)}. Thanks, Austin`}
+function callBox(i){const c=calls[i.id];if(!c)return'';const st=c.status;
+  const tel=c.tel?` <a href="tel:${esc(c.tel)}">Call</a> · <a href="sms:${esc(c.tel)}?&body=${encodeURIComponent(c.msg||msgFor(i))}">Text</a>`:'';
+  if(st==='sent')return `<div class="callres">Asking your PC to check…</div>`;
+  if(st==='calling')return `<div class="callres">📞 Net Hero is calling the seller now…</div>`;
+  if(st==='done'){const w={yes:'<b>Available</b>',no:'<span class="neg">Gone</span>',not_reached:'No answer',unsure:'Unclear'}[c.available]||esc(c.available);
+    return `<div class="callres">📞 ${w}${c.pickup_time?' · '+esc(c.pickup_time):''}${c.pickup_details?'<br>'+esc(c.pickup_details):''}${c.notes?'<br><span style="color:var(--mut)">'+esc(c.notes)+'</span>':''}${!c.pickup_time&&c.summary?'<br><span style="color:var(--mut)">'+esc(c.summary)+'</span>':''}${tel}</div>`}
+  return `<div class="callres">${esc(c.note||st)}${tel}</div>`}
+function card(i){const isNew=mode==='radar'&&!firstRun&&!seen.has(i.id),inRun=run.includes(i.id),v=i.v;
+  const val=v?`<div class="val">${i.p?`Asking <b>${money(i.p)}</b> · `:''}${v.rh?`Resale about <b>${money(v.rl)}–${money(v.rh)}</b>`:''}${v.rh&&v.sc?' · ':''}${v.sc?`Scrap about <b>${money(v.sc)}</b> (${v.w} lb ${v.m})`:''}${!v.rh&&!v.sc?'No clear value from the title':''}${i.dm!=null&&(v.best||i.p)?` · gas ${money(i.fuel)} round trip → <b class="${i.net<0?'neg':''}">net ${i.net<0?'-':''}${money(Math.abs(i.net))}</b>`:''}<br><span style="color:var(--mut);font-size:12px">${v.by==='ai'?'AI estimate from the title':'Rule-of-thumb weight'} · ${v.cf} confidence${v.why?' · '+esc(v.why):''}</span></div>`:(i.p?`<div class="val">Asking <b>${money(i.p)}</b> · value estimate coming</div>`:'');
+  return `<div class="card s${i.s||1}${isNew?' new':''}${inRun?' in':''}">${i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}${v&&v.best?`<small>worth ~${money(v.best)}</small>`:''}</div>`:''}${i.img?`<img class="thumb" loading="lazy" alt="" src="${esc(i.img)}">`:''}<div class="t">${esc(i.t)}</div>
+    <div class="m"><span class="tag">${esc(i.c||'item')}</span><span class="tag">${SRC[i.src]||'Craigslist'}</span>${i.watch?`<span class="tag" style="color:var(--srch)">watch: ${esc(i.watch)}</span>`:''}${isNew?'<span class="tag" style="color:#4ade80">new</span>':''}${esc(i.h)} · ${i.px==='exact'?'pin exact':'pin approximate'}${i.posted?' · posted '+age(i.posted):''}</div>
+    ${i.n?`<div class="n">${esc(i.n)}</div>`:''}${val}${callBox(i)}
+    <div class="acts"><button class="${inRun?'':'add'}" data-run="${esc(i.id)}">${inRun?'Remove from run':'Add to run'}</button>${i.src==='cl'||!i.src?`<button data-check="${esc(i.id)}">Check availability</button>`:''}<button data-msg="${esc(i.id)}">Message</button><a href="https://www.google.com/maps/dir/?api=1&destination=${i.la},${i.lo}" target="_blank" rel="noopener">Navigate</a><a href="${esc(i.u)}" target="_blank" rel="noopener">Listing</a><button data-got="${esc(i.id)}">Got it</button><button data-hide="${esc(i.id)}">Gone / skip</button></div></div>`}
+
+/* ---------- main render ---------- */
 function render(){
-  const r=+$('rad').value,min=+$('min').value,src=$('src').value,q=$('q').value.trim().toLowerCase(),sort=$('sort').value;
-  let rows=items.filter(i=>!hidden.has(i.id)&&(run.includes(i.id)||(i.s>=min&&(!src||i.src===src)&&(!q||(i.t+' '+i.h).toLowerCase().includes(q))))).map(i=>{const dm=me?dist(me.la,me.lo,i.la,i.lo):null,best=(i.v&&i.v.best)||0,fuel=dm==null?0:trip(dm*2);return{...i,dm,fuel,net:best-fuel}});
-  if(me)rows=rows.filter(i=>i.dm<=r||run.includes(i.id));
-  const when=i=>new Date(i.posted||i.first||0).getTime();
-  rows.sort(sort==='net'?(a,b)=>b.net-a.net:sort==='new'?(a,b)=>when(b)-when(a):(a,b)=>me?a.dm-b.dm:b.s-a.s);
+  const br=blockRe(),keep=i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t));
+  let rows=[],pinColor=null;
+  if(mode==='radar'){const r=+$('rad').value,min=+$('min').value,src=$('src').value,q=$('q').value.trim().toLowerCase();
+    rows=items.filter(i=>run.includes(i.id)||(keep(i)&&i.s>=min&&(!src||i.src===src)&&(!q||(i.t+' '+i.h).toLowerCase().includes(q)))).map(enrich);
+    if(me)rows=rows.filter(i=>i.dm<=r||run.includes(i.id))}
+  else if(mode==='search'){rows=(search&&search.items||[]).filter(keep).map(enrich);pinColor='#a78bfa'}
+  else if(mode==='watches'){rows=hits.filter(keep).map(enrich);pinColor='#a78bfa'}
+  else if(mode==='calls'){rows=Object.entries(calls).sort((a,b)=>(b[1].t||0)-(a[1].t||0)).map(([k])=>lookup(k)).filter(Boolean).map(enrich)}
+  const sort=$('sort').value,when=i=>new Date(i.posted||i.first||0).getTime();
+  if(mode!=='calls')rows.sort(sort==='net'?(a,b)=>b.net-a.net:sort==='val'?(a,b)=>((b.v&&b.v.best)||0)-((a.v&&a.v.best)||0):sort==='new'?(a,b)=>when(b)-when(a):(a,b)=>me?a.dm-b.dm:(b.s||0)-(a.s||0));
   pins.clearLayers();
-  rows.forEach(i=>L.circleMarker([i.la,i.lo],{radius:i.px==='exact'?8:6,color:color(i.s),weight:2,fillOpacity:i.px==='exact'?.85:.35,dashArray:i.px==='exact'?null:'3'}).addTo(pins)
-    .bindPopup(`<b>${esc(i.t)}</b><br>${esc(i.h)}<br><a href="${i.u}" target="_blank" rel="noopener">Open listing</a>`));
+  rows.forEach(i=>L.circleMarker([i.la,i.lo],{radius:i.px==='exact'?8:6,color:pinColor||color(i.s),weight:2,fillOpacity:i.px==='exact'?.85:.35,dashArray:i.px==='exact'?null:'3'}).addTo(pins)
+    .bindPopup(`<b>${esc(i.t)}</b><br>${esc(i.h)}${i.p?' · $'+Math.round(i.p):''}<br><a href="${esc(i.u)}" target="_blank" rel="noopener">Open listing</a>`));
   if(ring){ring.remove();ring=null}
-  if(me&&r<900)ring=L.circle([me.la,me.lo],{radius:r*1609.34,color:'#4ade80',weight:1,fillOpacity:.05}).addTo(map);
-  $('list').innerHTML=rows.length?rows.map(i=>{const isNew=!firstRun&&!seen.has(i.id),inRun=run.includes(i.id);
-    return `<div class="card s${i.s}${isNew?' new':''}${inRun?' in':''}">${i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}</div>`:''}${i.img?`<img class="thumb" loading="lazy" alt="" src="${esc(i.img)}">`:''}<div class="t">${esc(i.t)}</div>
-    <div class="m"><span class="tag">${i.c}</span><span class="tag">${SRC[i.src]||'Craigslist'}</span>${isNew?'<span class="tag" style="color:#4ade80">new</span>':''}${esc(i.h)} · ${i.px==='exact'?'pin exact':'pin approximate'}${i.posted?' · posted '+age(i.posted):''}</div>
-    ${i.n?`<div class="n">${esc(i.n)}</div>`:''}
-    ${i.v?`<div class="val">${i.v.rh?`Resale about <b>${money(i.v.rl)}–${money(i.v.rh)}</b>`:''}${i.v.rh&&i.v.sc?' · ':''}${i.v.sc?`Scrap about <b>${money(i.v.sc)}</b> (${i.v.w} lb ${i.v.m})`:''}${!i.v.rh&&!i.v.sc?'No clear value from the title':''}${i.dm!=null&&i.v.best?` · gas ${money(i.fuel)} round trip → <b class="${i.net<0?'neg':''}">net ${i.net<0?'-':''}${money(Math.abs(i.net))}</b>`:''}<br><span style="color:var(--mut);font-size:12px">${i.v.by==='ai'?'AI estimate from the title':'Rule-of-thumb weight'} · ${i.v.cf} confidence${i.v.why?' · '+esc(i.v.why):''}</span></div>`:''}
-    <div class="acts"><button class="${inRun?'':'add'}" data-run="${i.id}">${inRun?'Remove from run':'Add to run'}</button><a href="https://www.google.com/maps/dir/?api=1&destination=${i.la},${i.lo}" target="_blank" rel="noopener">Navigate</a><a href="${i.u}" target="_blank" rel="noopener">Listing</a><button data-got="${i.id}">Got it</button><button data-hide="${i.id}">Gone / skip</button></div></div>`}).join('')
-    :`<div class="empty">${me?'Nothing in range at this value level. Widen the range or lower the value filter.':'Waiting for GPS. Tap the map to set your position by hand.'}</div>`;
-  $('stat').innerHTML=`${rows.length} shown / ${items.length} tracked${haul.length?` · haul: ${haul.length} items, about ${money(haul.reduce((a,h)=>a+h.v,0))}`:''}<br>${me?(meManual?'position set by hand':'GPS live'):'no position yet'} · scan ${scanned?age(scanned):'?'}${statusOk?'':' · <span style="color:#fbbf24">last scan failed</span>'}`;
-  if(me&&!meManual)rows.filter(i=>i.s>=4&&i.dm<=Math.min(r,3)&&!announced.has(i.id)).slice(0,2).forEach(i=>{announced.add(i.id);
+  const rr=mode==='search'?+$('srad').value:+$('rad').value;
+  if(me&&rr<900&&(mode==='radar'||mode==='search'))ring=L.circle([me.la,me.lo],{radius:rr*1609.34,color:mode==='search'?'#a78bfa':'#4ade80',weight:1,fillOpacity:.05}).addTo(map);
+  let head='';
+  if(mode==='search'){head=search?`<div class="sum">${search.state==='searching'?'Your PC is searching for "'+esc(search.q)+'"…':search.state==='estimating'?'Results for "'+esc(search.q)+'" · estimating values…':'Results for "'+esc(search.q)+'" · '+rows.length+' shown'}${search.errs&&Object.keys(search.errs).length?' · couldn\'t search '+Object.keys(search.errs).map(k=>SRC[k]).join(', '):''}</div>`:'<div class="empty">Type what you are after and tap "Scan with my PC", or open the search on any site with the buttons above.</div>'}
+  if(mode==='watches')head=watchList.length?watchList.map(w=>`<div class="watch"><div><b>${esc(w.q)}</b><div class="m">${w.free?'free only':w.max==null?'any price':'up to $'+w.max} · ${w.r} mi · ${w.hits||0} new matches so far</div></div><button data-unwatch="${esc(w.id)}">Stop</button></div>`).join('')+(rows.length?'<div class="sum">Recent matches</div>':''):`<div class="empty">${link?'No watches yet. Search for something, then tap "Watch this search".':'Link your PC first (Settings ⚙︎).'}</div>`;
+  if(mode==='calls'&&!rows.length)head='<div class="empty">No availability checks yet. Tap "Check availability" on a Craigslist listing.</div>';
+  $('list').innerHTML=head+(rows.length?rows.map(card).join(''):(mode==='radar'?`<div class="empty">${me?'Nothing in range at this value level. Widen the range, lower the value filter, or turn categories back on in Settings.':'Waiting for GPS. Tap the map to set your position by hand.'}</div>`:''));
+  const on=link&&pc&&pc.last&&Date.now()-pc.last<6*60e3;
+  $('stat').innerHTML=`${mode==='radar'?rows.length+' shown / '+items.length+' tracked':''}${haul.length?` · haul: ${haul.length}, ~${money(haul.reduce((a,h)=>a+h.v,0))}`:''}<br>${link?`<span class="dot ${on?'on':''}"></span>PC ${on?'online':'linked'} · `:''}${me?(meManual?'position set by hand':'GPS live'):'no position yet'} · scan ${scanned?age(scanned):'?'}${statusOk?'':' · <span style="color:#fbbf24">last scan failed</span>'}`;
+  if(mode==='radar'&&me&&!meManual)rows.filter(i=>i.s>=4&&i.dm<=Math.min(+$('rad').value,3)&&!announced.has(i.id)).slice(0,2).forEach(i=>{announced.add(i.id);
     try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
     if(voice&&window.speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance(`${i.t}, ${i.dm.toFixed(1)} miles ${bearing(me.la,me.lo,i.la,i.lo)}`))});
   renderRun();
 }
 function setMe(la,lo,manual){const first=!me;me={la,lo};meManual=manual;
   if(!meMark)meMark=L.marker([la,lo],{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[16,16],iconAnchor:[8,8]}),zIndexOffset:1000}).addTo(map);else meMark.setLatLng([la,lo]);
-  if(first)map.setView([la,lo],11);else if(follow&&!manual)map.panTo([la,lo]);render()}
-async function load(){try{
-  const[d,s]=await Promise.all([fetch('listings.json?t='+Date.now()).then(r=>r.json()),fetch('status.json?t='+Date.now()).then(r=>r.json()).catch(()=>({ok:true}))]);
+  if(first)map.setView([la,lo],11);else if(follow&&!manual)map.panTo([la,lo]);render();renderLinks()}
+async function load(fresh){try{
+  const url=fresh?'https://api.github.com/repos/Raganamos/scrap-radar/contents/listings.json':'listings.json?t='+Date.now();
+  const d=await fetch(url,fresh?{headers:{Accept:'application/vnd.github.raw+json'}}:{}).then(r=>r.json());
+  const s=await fetch('status.json?t='+Date.now()).then(r=>r.json()).catch(()=>({ok:true}));
   items=d.items;scanned=d.scanned;statusOk=s.ok!==false;render();
   if(firstRun&&seen.size===0){items.forEach(i=>seen.add(i.id));LS('sr_seen',[...seen])}
-}catch(e){$('stat').textContent='Could not load scan data'}}
-document.addEventListener('click',e=>{const t=e.target;
-  if(t.dataset.hide){hidden.add(t.dataset.hide);run=run.filter(x=>x!==t.dataset.hide);LS('sr_hidden',[...hidden]);LS('sr_run',run);render()}
-  if(t.dataset.got){const it=items.find(i=>i.id===t.dataset.got);haul.push({id:t.dataset.got,t:it?it.t:'',v:(it&&it.v&&it.v.best)||0,at:Date.now()});LS('sr_haul',haul);hidden.add(t.dataset.got);run=run.filter(x=>x!==t.dataset.got);LS('sr_hidden',[...hidden]);LS('sr_run',run);render()}
-  if(t.dataset.run){run=run.includes(t.dataset.run)?run.filter(x=>x!==t.dataset.run):[...run,t.dataset.run];LS('sr_run',run);render()}});
-$('rad').value=cfg.rad;$('min').value=cfg.min;$('sort').value=cfg.sort;$('mpg').value=cfg.mpg;$('gas').value=cfg.gas;
-const save=()=>{cfg={mpg:+$('mpg').value||15,gas:+$('gas').value||0,rad:$('rad').value,min:$('min').value,sort:$('sort').value};LS('sr_cfg',cfg);render()};
-['rad','min','sort','mpg','gas'].forEach(k=>$(k).onchange=save);$('src').onchange=$('end').onchange=render;$('q').oninput=render;
-$('setbtn').onclick=()=>{const s=$('set');s.style.display=s.style.display==='flex'?'none':'flex'};
-$('showhidden').onclick=()=>{hidden=new Set();LS('sr_hidden',[]);render()};
-$('resethaul').onclick=()=>{haul=[];LS('sr_haul',haul);render()};
-$('clear').onclick=()=>{run=[];LS('sr_run',run);render()};
+}catch(e){if(fresh)return load(false);$('stat').textContent='Could not load scan data'}}
+
+/* ---------- search links ---------- */
+function searchArgs(){const q=$('sq').value.trim(),mx=$('smax').value,r=+$('srad').value;return{q,free:mx==='0',max:mx==='any'?null:+mx,r,la:me?+me.la.toFixed(2):28.04,lo:me?+me.lo.toFixed(2):-81.95}}
+function renderLinks(){const a=searchArgs(),e=encodeURIComponent(a.q||'free'),pm=a.free?0:a.max;
+  const L2=[['Craigslist',`https://tampa.craigslist.org/search/${a.free?'zip':'sss'}?query=${e}&lat=${a.la}&lon=${a.lo}&search_distance=${a.r}${!a.free&&pm!=null?'&max_price='+pm:''}`],
+    ['Facebook',`https://www.facebook.com/marketplace/search/?query=${e}${pm!=null?'&maxPrice='+pm:''}&exact=false`],
+    ['OfferUp',`https://offerup.com/search?q=${e}${pm!=null?'&price_max='+pm:''}`],
+    ['eBay pickup',`https://www.ebay.com/sch/i.html?_nkw=${e}${pm?'&_udhi='+pm:''}&LH_LPickup=1&_sadis=${a.r}`],
+    ['Trash Nothing',`https://trashnothing.com/beta/browse?latitude=${a.la}&longitude=${a.lo}&radius=${Math.round(a.r*1609)}&types=offer&search=${e}`],
+    ['Nextdoor',`https://nextdoor.com/for_sale_and_free/?query=${e}`]];
+  $('slinks').innerHTML='<span>Or open this search on each site (uses your sign-ins there):</span>'+L2.map(([n,u])=>`<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}
+
+/* ---------- events ---------- */
+document.addEventListener('click',async e=>{const t=e.target.closest('button,[data-mode]');if(!t)return;const d=t.dataset;
+  if(d.mode){mode=d.mode;document.querySelectorAll('nav [data-mode]').forEach(b=>b.classList.toggle('on',b===t));['radar','search','watches','calls'].forEach(m=>$('p-'+m).classList.toggle('show',m===mode));if(mode==='watches'||mode==='calls')send({c:'ping'});render();return}
+  if(d.hide){hidden.add(d.hide);run=run.filter(x=>x!==d.hide);LS('sr_hidden',[...hidden]);LS('sr_run',run);render()}
+  if(d.got){const it=lookup(d.got);haul.push({id:d.got,t:it?it.t:'',v:(it&&it.v&&it.v.best)||0,at:Date.now()});LS('sr_haul',haul);hidden.add(d.got);run=run.filter(x=>x!==d.got);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Added to your haul');render()}
+  if(d.run){const it=lookup(d.run);if(run.includes(d.run))run=run.filter(x=>x!==d.run);else{run=[...run,d.run];if(it)runItems[d.run]=it}
+    Object.keys(runItems).forEach(k=>{if(!run.includes(k))delete runItems[k]});LS('sr_run',run);LS('sr_runitems',runItems);render()}
+  if(d.msg){const i=enrich(lookup(d.msg));const m=msgFor(i);try{await navigator.clipboard.writeText(m);toast('Message copied. Paste it to the seller.')}catch(err){toast(m,8000)}window.open(i.u,'_blank','noopener')}
+  if(d.check){const i=enrich(lookup(d.check));if(await send({c:'check',id:i.id,u:i.u,t:i.t,h:i.h,src:i.src||'cl',eta:etaFor(i)})){calls[i.id]={id:i.id,status:'sent',t:Date.now()};LS('sr_calls',calls);toast('Sent to your PC');render()}}
+  if(d.unwatch){send({c:'watch_del',id:d.unwatch})}
+});
+$('setbtn').onclick=()=>$('set').classList.toggle('show');
+$('sgo').onclick=async()=>{const a=searchArgs();if(!a.q)return toast('Type what you are looking for first');if(!me)toast('No GPS yet: searching around Lakeland');
+  const rid=hex(crypto.getRandomValues(new Uint8Array(3)));search={rid,q:a.q,items:[],state:'searching',at:Date.now()};LS('sr_search',search);render();
+  if(!await send({c:'search',rid,q:a.q,max:a.free?0:a.max,free:a.free,r:a.r,la:a.la,lo:a.lo})){search.state='done';render()}};
+$('sq').addEventListener('keydown',e=>{if(e.key==='Enter')$('sgo').click()});
+$('swatch').onclick=()=>{const a=searchArgs();if(!a.q)return toast('Type what to watch for first');send({c:'watch_add',q:a.q,max:a.free?0:a.max,free:a.free,r:a.r,la:a.la,lo:a.lo});toast('Setting up the watch…')};
+['sq','smax','srad'].forEach(k=>$(k).addEventListener('input',renderLinks));
+$('rescan').onclick=()=>send({c:'rescan'});
+$('ping').onclick=()=>{send({c:'ping'});toast('Asked your PC to check in')};
+$('unlink').onclick=()=>{localStorage.removeItem('sr_pair');link=null;if(es)es.close();updateLinkUI();render()};
+$('copytopic').onclick=async()=>{try{await navigator.clipboard.writeText(link.alerts);toast('Topic copied: paste it into ntfy → Subscribe')}catch(e){toast(link.alerts,8000)}};
+$('cats').innerHTML=CATS.map(c=>`<button class="chip ${cfg.off.includes(c)?'off':''}" data-cat="${c}">${c}</button>`).join('');
+$('cats').onclick=e=>{const c=e.target.dataset.cat;if(!c)return;cfg.off=cfg.off.includes(c)?cfg.off.filter(x=>x!==c):[...cfg.off,c];e.target.classList.toggle('off');LS('sr_cfg',cfg);render()};
+$('rad').value=cfg.rad;$('min').value=cfg.min;$('sort').value=cfg.sort;$('mpg').value=cfg.mpg;$('gas').value=cfg.gas;$('block').value=cfg.block;
+const save=()=>{Object.assign(cfg,{mpg:+$('mpg').value||15,gas:+$('gas').value||0,rad:$('rad').value,min:$('min').value,sort:$('sort').value,block:$('block').value});LS('sr_cfg',cfg);render()};
+['rad','min','sort','mpg','gas','block'].forEach(k=>$(k).onchange=save);$('src').onchange=$('end').onchange=render;$('q').oninput=render;
+$('clear').onclick=()=>{run=[];runItems={};LS('sr_run',run);LS('sr_runitems',runItems);render()};
 $('sethome').onclick=()=>{if(me){home={la:me.la,lo:me.lo};LS('sr_home',home);$('sethome').textContent='Home saved';$('end').value='home';render()}};
 $('recenter').onclick=()=>{follow=true;if(me)map.setView([me.la,me.lo],Math.max(map.getZoom(),11))};
 $('voice').onclick=()=>{voice=!voice;$('voice').textContent='Voice alerts '+(voice?'on':'off');$('voice').classList.toggle('on',voice);if(voice&&window.speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance('Voice alerts on'))};
+$('showhidden').onclick=()=>{hidden=new Set();LS('sr_hidden',[]);render()};
+$('resethaul').onclick=()=>{haul=[];LS('sr_haul',haul);render()};
 map.on('click',e=>{if(!me||meManual)setMe(e.latlng.lat,e.latlng.lng,true)});
 if(navigator.geolocation)navigator.geolocation.watchPosition(p=>setMe(p.coords.latitude,p.coords.longitude,false),()=>render(),{enableHighAccuracy:true,maximumAge:15000,timeout:30000});
 if(navigator.wakeLock){const wl=()=>navigator.wakeLock.request('screen').catch(()=>{});wl();document.addEventListener('visibilitychange',()=>document.visibilityState==='visible'&&wl())}
-load();setInterval(load,180000);
+if(location.hash==='#watches')setTimeout(()=>document.querySelector('[data-mode=watches]').click(),0);
+renderLinks();setupLink();load();setInterval(()=>load(false),180000);setInterval(()=>{if(link)send({c:'ping'})},300000);
 window.addEventListener('pagehide',()=>{items.forEach(i=>seen.add(i.id));LS('sr_seen',[...seen])});
 </script></body></html>
