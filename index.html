@@ -262,7 +262,7 @@ function renderSys(){const b=sys.by_source||{},si=sys.signed_in||{},src=sys.sour
   $('sysbox').innerHTML=`<b style="color:var(--tx)">Automatic scanning</b> · every 30 min on your PC · last ${sys.at?age(sys.at):'?'}${sys.ok===false?' · <span class="neg">last scan failed</span>':''}<br>
    Tracked now: ${f('Craigslist','cl')} · ${f('OfferUp','ou')} · ${f('Trash Nothing','tn')} · ${f('Facebook','fb')} · ${f('Nextdoor','nd')}<br>
    Facebook: ${signed(si.facebook)} · Nextdoor: ${signed(si.nextdoor)}<br>
-   Value estimates: local AI on your PC, ${sys.estimated_this_run!=null?sys.estimated_this_run:'?'} new last scan${Object.values(src).some(v=>typeof v==='string')?'<br><span class="neg">Source errors: '+esc(Object.entries(src).filter(([k,v])=>typeof v==='string').map(([k,v])=>k+' '+v).join('; '))+'</span>':''}`}
+   Value estimates: local AI on your PC, ${sys.estimated_this_run!=null?sys.estimated_this_run:'?'} new last scan${sys.ai_note?' ('+esc(sys.ai_note)+')':''}${sys.ai_backlog?` · ${sys.ai_backlog} still on rule-of-thumb, catching up when the GPU is free`:''}${Object.values(src).some(v=>typeof v==='string')?'<br><span class="neg">Source errors: '+esc(Object.entries(src).filter(([k,v])=>typeof v==='string').map(([k,v])=>k+' '+v).join('; '))+'</span>':''}`}
 /* ---------- search links ---------- */
 function searchArgs(){const q=$('sq').value.trim(),mx=$('smax').value,r=+$('srad').value;return{q,free:mx==='0',max:mx==='any'?null:+mx,r,la:me?+me.la.toFixed(2):28.04,lo:me?+me.lo.toFixed(2):-81.95}}
 function renderLinks(){const a=searchArgs(),e=encodeURIComponent(a.q||'free'),pm=a.free?0:a.max;
