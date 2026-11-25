@@ -49,7 +49,14 @@ ALIAS = {"st pete beach": "st pete beach", "st. pete beach": "st pete beach", "s
          "davenport": (28.161, -81.602), "polk city": (28.182, -81.824), "kathleen": (28.121, -82.023), "highland city": "highland city",
          "ulmerton": (27.894, -82.75), "kenneth city": (27.816, -82.72), "indian rocks": (27.875, -82.85), "treasure island": (27.769, -82.769),
          "redington": (27.82, -82.82), "south pasadena": "south pasadena", "tierra verde": (27.692, -82.723), "citrus park": (28.078, -82.57),
-         "egypt lake": (28.017, -82.506), "pebble creek": (28.148, -82.345), "fishhawk": (27.851, -82.21), "bloomingdale": (27.893, -82.24)}
+         "egypt lake": (28.017, -82.506), "pebble creek": (28.148, -82.345), "fishhawk": (27.851, -82.21), "bloomingdale": (27.893, -82.24),
+         "orlando": (28.538, -81.379), "kissimmee": (28.292, -81.408), "clermont": (28.549, -81.773), "sanford": (28.8, -81.273), "leesburg": (28.811, -81.878),
+         "lady lake": (28.917, -81.923), "venice": (27.1, -82.454), "englewood": (26.962, -82.352), "north port": (27.044, -82.236), "ocala": (29.187, -82.14),
+         "auburndale": (28.065, -81.789), "lake wales": (27.901, -81.586), "frostproof": (27.746, -81.531), "fort meade": (27.752, -81.802),
+         "zephyrhills": (28.233, -82.181), "dade city": (28.365, -82.196), "wesley chapel": (28.24, -82.33), "lutz": (28.151, -82.461),
+         "odessa": (28.194, -82.59), "trinity": (28.18, -82.68), "palm harbor": (28.078, -82.764), "riverview": (27.866, -82.326),
+         "sun city": (27.718, -82.352), "ellenton": (27.522, -82.528), "lakewood ranch": (27.41, -82.43), "myakka": (27.36, -82.16),
+         "haines city": (28.114, -81.618), "eagle lake": (27.978, -81.756), "mulberry": (27.895, -81.973), "bartow": (27.896, -81.843)}
 
 def geo_text(text, lid):
     """Place a listing from free text such as 'Pinellas Park, FL' or 'Off Ulmerton, Largo Mall area'."""
@@ -67,27 +74,31 @@ def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Language": "en-US,en;q=0.9"})
     return urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
 
-def cl_parse(page, seen, rows):
+PRICE = {}
+def cl_parse(page, seen, rows, free_only=False):
     for m in re.finditer(r'<li class="cl-static-search-result"[^>]*>\s*<a href="([^"]+)">(.*?)</a>', page, re.S):
         url, body = m.group(1), m.group(2)
         t = re.search(r'class="title">(.*?)</div>', body, re.S); l = re.search(r'class="location">(.*?)</div>', body, re.S)
+        p = re.search(r'class="price">\s*\$?([\d,]+)', body)
+        price = int(p.group(1).replace(",", "")) if p else 0
         lid = re.sub(r"\.html$", "", url.rstrip("/").split("/")[-1])
-        if lid in seen or not t: continue
-        seen.add(lid)
+        if lid in seen or not t or (free_only and price > 1): continue
+        seen.add(lid); PRICE[lid] = price
         rows.append((url, html.unescape(t.group(1)).strip(), html.unescape(l.group(1)).strip() if l else "", lid, "cl"))
 
 def src_craigslist(seen, rows):
     for s in CFG["scans"]:
         base = f"https://{s['site']}.craigslist.org/search/%s?lat={s['lat']}&lon={s['lon']}&search_distance={s['miles']}"
         cl_parse(get(base % "zip"), seen, rows); time.sleep(2)
-        for q in CFG.get("cl_queries", []):   # free things people post in the for-sale sections
-            try: cl_parse(get(base % "sss" + "&max_price=0&query=" + urllib.parse.quote(q)), seen, rows)
+        for q in CFG.get("cl_queries", []):   # free things people post in the for-sale sections ("" = every $0 listing)
+            try: cl_parse(get(base % "sss" + "&max_price=1" + ("&query=" + urllib.parse.quote(q) if q else "")), seen, rows, free_only=True)
             except Exception: pass
             time.sleep(2)
 
 def src_offerup(seen, rows):
-    for z in CFG.get("offerup_zips", []):
-        pg = get(f"https://offerup.com/search?q=free&price_max=0&zipcode={z}&radius=30")
+    for z, q in [(z, q) for z in CFG.get("offerup_zips", []) for q in CFG.get("offerup_queries", ["free"])]:
+        try: pg = get(f"https://offerup.com/search?q={urllib.parse.quote(q)}&price_max=0&zipcode={z}&radius=30")
+        except Exception: continue
         nd = json.loads(re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', pg, re.S).group(1))
         for t in nd["props"]["pageProps"]["searchFeedResponse"]["looseTiles"]:
             x = t.get("listing") or {}
@@ -112,8 +123,18 @@ def src_trashnothing(seen, rows):
             rows.append(("https://trashnothing.com" + m.group(1), re.sub(r"\s*\([^()]*\)\s*$", "", full), loc.group(1) if loc else "", lid, "tn"))
         time.sleep(2)
 
+def src_browser(seen, rows):
+    p = "browser_rows.json"
+    if not os.path.exists(p) or time.time() - os.path.getmtime(p) > 8 * 3600: return
+    for r in json.load(open(p, encoding="utf-8")).get("rows", []):
+        lid = r["id"]
+        if lid in seen: continue
+        seen.add(lid); PRICE[lid] = r.get("p", 0)
+        if r.get("img"): IMG[lid] = r["img"]
+        rows.append((r["u"], r["t"], r.get("h", ""), lid, r["src"]))
+
 IMG = {}
-SOURCES = {"craigslist": src_craigslist, "offerup": src_offerup, "trashnothing": src_trashnothing}
+SOURCES = {"craigslist": src_craigslist, "offerup": src_offerup, "trashnothing": src_trashnothing, "signed_in_sites": src_browser}
 
 def live_rows(status):
     rows, seen = [], set(); status["sources"] = {}
@@ -219,13 +240,18 @@ def main():
                 if ex.get(k): it[k] = ex[k]
         else:
             g = (area_geo(url.replace("https://", ""), hood, lid) if src == "cl" else None) or geo_text(hood, lid)
+            if not g and src == "nd": g = geo_text(CFG.get("home_area", "lakeland"), lid)
             if not g: continue
             it.update(la=g[0], lo=g[1], px="area")
         if IMG.get(lid): it["img"] = IMG[lid]
+        if PRICE.get(lid): it["p"] = PRICE[lid]
         items.append(it)
     live_ids = {r[3] for r in rows}
     json.dump({k: v for k, v in exact.items() if k in live_ids or seed}, open("exact.json", "w"), indent=0)
     status["estimated_this_run"] = add_values(items, seed)
+    try: status["signed_in"] = json.load(open("browser_rows.json", encoding="utf-8")).get("status", {})
+    except Exception: pass
+    status["by_source"] = {k: sum(1 for i in items if i.get("src") == k) for k in ("cl", "ou", "tn", "fb", "nd")}
     json.dump({"scanned": NOW, "count": len(items), "prices": PRICES, "items": items}, open("listings.json", "w"), separators=(",", ":"))
     status["count"] = len(items); json.dump(status, open("status.json", "w"))
     print("wrote", len(items), "items;", lookups, "detail lookups")
