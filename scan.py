@@ -96,6 +96,7 @@ def src_offerup(seen, rows):
             lid = "ou-" + str(x.get("listingId", ""))
             if not x.get("listingId") or not free or lid in seen: continue
             seen.add(lid)
+            IMG[lid] = ((x.get("image") or {}).get("url") or "")
             rows.append(("https://offerup.com/item/detail/" + x["listingId"], (x.get("title") or "").strip(), x.get("locationName") or "", lid, "ou"))
         time.sleep(2)
 
@@ -111,6 +112,7 @@ def src_trashnothing(seen, rows):
             rows.append(("https://trashnothing.com" + m.group(1), re.sub(r"\s*\([^()]*\)\s*$", "", full), loc.group(1) if loc else "", lid, "tn"))
         time.sleep(2)
 
+IMG = {}
 SOURCES = {"craigslist": src_craigslist, "offerup": src_offerup, "trashnothing": src_trashnothing}
 
 def live_rows(status):
@@ -120,6 +122,64 @@ def live_rows(status):
         try: fn(seen, rows); status["sources"][name] = len(rows) - n
         except Exception as e: status["sources"][name] = "failed: " + str(e)[:80]
     return rows
+
+# ---------- value estimates ----------
+PRICES = CFG.get("scrap_prices", {})
+RULE_W = [(r"washer|washing machine", 150, "steel"), (r"dryer", 120, "steel"), (r"fridge|refrigerator|freezer", 220, "steel"), (r"stove|oven|range", 150, "steel"),
+          (r"dishwasher", 80, "steel"), (r"microwave", 30, "steel"), (r"water heater", 110, "steel"), (r"grill|smoker", 60, "steel"), (r"treadmill", 200, "steel"),
+          (r"filing cabinet", 50, "steel"), (r"shelving", 80, "steel"), (r"mower", 60, "steel"), (r"bed ?frame|headboard", 40, "steel"), (r"cages?", 40, "steel"),
+          (r"copper", 15, "copper"), (r"alumin", 20, "aluminum"), (r"stainless", 40, "stainless"), (r"\btvs?\b|monitor|printer|copier", 30, "ewaste")]
+EST_PROMPT = """You estimate what a free second-hand item is worth to someone who hauls things away to resell or scrap, in Florida.
+Listing title: "%s"
+Give typical real-world numbers for this KIND of item, not zeros:
+- resale_low: dollars it sells for locally as-is / untested (integer; 0 only if nobody buys this kind of thing used)
+- resale_high: dollars a clean working one sells for locally, used (integer)
+- weight_lb: typical total weight of the item in pounds if it went to a scrap yard (integer; 0 only for non-metal things like wood, books, clothes)
+- metal: main scrap metal: "steel", "copper", "aluminum", "stainless", "ewaste" (electronics) or "none"
+- confidence: "high" if the title names a specific item, "medium" if it names a kind of item, "low" if vague
+- why: under 12 words
+Examples: washing machine -> {"resale_low":20,"resale_high":120,"weight_lb":150,"metal":"steel","confidence":"medium","why":"common appliance, steady used demand"}
+aluminum boat no motor -> {"resale_low":150,"resale_high":600,"weight_lb":250,"metal":"aluminum","confidence":"medium","why":"small boats resell; hull is aluminum"}
+"curb alert" -> {"resale_low":0,"resale_high":0,"weight_lb":0,"metal":"none","confidence":"low","why":"no item named"}
+Reply with one JSON object only."""
+
+def llm_estimate(title):
+    body = {"model": CFG.get("estimate_model", "qwen3.5:9b"), "stream": False, "format": "json", "think": False, "keep_alive": "2m",
+            "options": {"temperature": 0, "num_predict": 160}, "messages": [{"role": "user", "content": EST_PROMPT % title.replace('"', "'")}]}
+    req = urllib.request.Request("http://localhost:11434/api/chat", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+    out = json.loads(urllib.request.urlopen(req, timeout=60).read())["message"]["content"]
+    j = json.loads(out)
+    num = lambda k: max(0, min(20000, int(float(j.get(k) or 0))))
+    return {"rl": num("resale_low"), "rh": max(num("resale_low"), num("resale_high")), "w": min(num("weight_lb"), 5000),
+            "m": j.get("metal") if j.get("metal") in PRICES else "none", "cf": j.get("confidence") if j.get("confidence") in ("low", "medium", "high") else "low",
+            "why": str(j.get("why", ""))[:80], "by": "ai"}
+
+def rule_estimate(title):
+    t = title.lower()
+    for rx, w, m in RULE_W:
+        if re.search(rx, t): return {"rl": 0, "rh": 0, "w": w, "m": m, "cf": "low", "why": "typical weight for this kind of item", "by": "rule"}
+    return None
+
+def add_values(items, seed):
+    cache = json.load(open("est.json")) if os.path.exists("est.json") else {}
+    budget, ai_ok, done = CFG.get("max_estimates_per_run", 30), not seed, 0
+    for it in sorted(items, key=lambda i: -i["s"]):
+        e = cache.get(it["id"])
+        if not e and ai_ok and it["s"] >= 3 and done < budget:
+            try: e = llm_estimate(it["t"]); done += 1
+            except Exception as ex:
+                if done == 0: ai_ok = False        # local model not reachable: fall back to rules for this run
+        if not e: e = rule_estimate(it["t"])
+        if not e: continue
+        if e.get("by") == "ai": cache[it["id"]] = e
+        sc = round(e["w"] * PRICES.get(e["m"], 0))
+        v = {"rl": e["rl"], "rh": e["rh"], "sc": sc, "cf": e["cf"], "why": e["why"], "by": e["by"]}
+        if e["w"] and e["m"] != "none": v["w"], v["m"] = e["w"], e["m"]
+        v["best"] = max(sc, e["rl"])   # conservative: scrap value or the as-is resale figure, whichever is higher
+        it["v"] = v
+    live = {i["id"] for i in items}
+    json.dump({k: v for k, v in cache.items() if k in live}, open("est.json", "w"))
+    return done
 
 def main():
     seed = sys.argv[2] if len(sys.argv) > 2 and sys.argv[1] == "--seed" else None
@@ -150,21 +210,27 @@ def main():
                 pg = get(url); time.sleep(2)
                 la = re.search(r'data-latitude="([-\d.]+)"', pg); lo = re.search(r'data-longitude="([-\d.]+)"', pg)
                 dt = re.search(r'datetime="([^"]+)"', pg)
-                if la and lo: ex = exact[lid] = {"la": float(la.group(1)), "lo": float(lo.group(1)), "posted": dt.group(1)[:16] if dt else ""}
+                im = re.search(r'https://images\.craigslist\.org/[\w_]+_(?:300x300|600x450)\.jpg', pg)
+                if la and lo: ex = exact[lid] = {"la": float(la.group(1)), "lo": float(lo.group(1)), "posted": dt.group(1)[:16] if dt else "", "img": im.group(0) if im else ""}
             except Exception: pass
         if ex:
             it.update(la=ex["la"], lo=ex["lo"], px="exact")
-            for k in ("posted", "n", "s"):
+            for k in ("posted", "n", "s", "img"):
                 if ex.get(k): it[k] = ex[k]
         else:
             g = (area_geo(url.replace("https://", ""), hood, lid) if src == "cl" else None) or geo_text(hood, lid)
             if not g: continue
             it.update(la=g[0], lo=g[1], px="area")
+        if IMG.get(lid): it["img"] = IMG[lid]
         items.append(it)
     live_ids = {r[3] for r in rows}
     json.dump({k: v for k, v in exact.items() if k in live_ids or seed}, open("exact.json", "w"), indent=0)
-    json.dump({"scanned": NOW, "count": len(items), "items": items}, open("listings.json", "w"), separators=(",", ":"))
+    status["estimated_this_run"] = add_values(items, seed)
+    json.dump({"scanned": NOW, "count": len(items), "prices": PRICES, "items": items}, open("listings.json", "w"), separators=(",", ":"))
     status["count"] = len(items); json.dump(status, open("status.json", "w"))
     print("wrote", len(items), "items;", lookups, "detail lookups")
 
-main()
+if len(sys.argv) > 2 and sys.argv[1] == "--esttest":
+    for t in sys.argv[2:]: print(t, "->", llm_estimate(t))
+else:
+    main()
