@@ -230,7 +230,8 @@ def main():
     status["count"] = len(items); json.dump(status, open("status.json", "w"))
     print("wrote", len(items), "items;", lookups, "detail lookups")
 
-if len(sys.argv) > 2 and sys.argv[1] == "--esttest":
-    for t in sys.argv[2:]: print(t, "->", llm_estimate(t))
-else:
-    main()
+if __name__ == "__main__":
+    if len(sys.argv) > 2 and sys.argv[1] == "--esttest":
+        for t in sys.argv[2:]: print(t, "->", llm_estimate(t))
+    else:
+        main()
