@@ -164,11 +164,28 @@ aluminum boat no motor -> {"resale_low":150,"resale_high":600,"weight_lb":250,"m
 "curb alert" -> {"resale_low":0,"resale_high":0,"weight_lb":0,"metal":"none","confidence":"low","why":"no item named"}
 Reply with one JSON object only."""
 
+def gpu_busy():
+    """True while a game or other heavy GPU work is running: the value AI then waits, so it never competes with priority use."""
+    try:
+        import subprocess
+        out = subprocess.run(["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
+                             capture_output=True, text=True, timeout=10, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+        util, used, total = [float(x) for x in out.strip().splitlines()[0].split(",")]
+        ollama_on_gpu = 0.0
+        try:
+            ps = json.loads(urllib.request.urlopen("http://localhost:11434/api/ps", timeout=5).read())
+            ollama_on_gpu = sum(m.get("size_vram", 0) for m in ps.get("models", [])) / 1048576
+        except Exception: pass
+        other = used - ollama_on_gpu
+        return util >= CFG.get("gpu_busy_util", 40) and ollama_on_gpu == 0 or other > total - 6500
+    except Exception:
+        return False
+
 def llm_estimate(title):
     body = {"model": CFG.get("estimate_model", "qwen3.5:9b"), "stream": False, "format": "json", "think": False, "keep_alive": "2m",
             "options": {"temperature": 0, "num_predict": 160}, "messages": [{"role": "user", "content": EST_PROMPT % title.replace('"', "'")}]}
     req = urllib.request.Request("http://localhost:11434/api/chat", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
-    out = json.loads(urllib.request.urlopen(req, timeout=60).read())["message"]["content"]
+    out = json.loads(urllib.request.urlopen(req, timeout=45).read())["message"]["content"]
     j = json.loads(out)
     num = lambda k: max(0, min(20000, int(float(j.get(k) or 0))))
     return {"rl": num("resale_low"), "rh": max(num("resale_low"), num("resale_high")), "w": min(num("weight_lb"), 5000),
@@ -181,15 +198,17 @@ def rule_estimate(title):
         if re.search(rx, t): return {"rl": 0, "rh": 0, "w": w, "m": m, "cf": "low", "why": "typical weight for this kind of item", "by": "rule"}
     return None
 
+AI_NOTE = {}
 def add_values(items, seed):
     cache = json.load(open("est.json")) if os.path.exists("est.json") else {}
     budget, ai_ok, done = CFG.get("max_estimates_per_run", 30), not seed, 0
+    if ai_ok and gpu_busy(): ai_ok = False; AI_NOTE["note"] = "paused: GPU busy (game or other heavy work running)"
     for it in sorted(items, key=lambda i: -i["s"]):
         e = cache.get(it["id"])
         if not e and ai_ok and it["s"] >= 3 and done < budget:
             try: e = llm_estimate(it["t"]); done += 1
             except Exception as ex:
-                if done == 0: ai_ok = False        # local model not reachable: fall back to rules for this run
+                ai_ok = False; AI_NOTE["note"] = "skipped: local model too slow or not running"   # try again next scan
         if not e: e = rule_estimate(it["t"])
         if not e: continue
         if e.get("by") == "ai": cache[it["id"]] = e
@@ -249,6 +268,8 @@ def main():
     live_ids = {r[3] for r in rows}
     json.dump({k: v for k, v in exact.items() if k in live_ids or seed}, open("exact.json", "w"), indent=0)
     status["estimated_this_run"] = add_values(items, seed)
+    if AI_NOTE: status["ai_note"] = AI_NOTE["note"]
+    status["ai_backlog"] = sum(1 for i in items if i["s"] >= 3 and (i.get("v") or {}).get("by") != "ai")
     try: status["signed_in"] = json.load(open("browser_rows.json", encoding="utf-8")).get("status", {})
     except Exception: pass
     status["by_source"] = {k: sum(1 for i in items if i.get("src") == k) for k in ("cl", "ou", "tn", "fb", "nd")}
