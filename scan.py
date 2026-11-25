@@ -192,11 +192,26 @@ def llm_estimate(title):
             "m": j.get("metal") if j.get("metal") in PRICES else "none", "cf": j.get("confidence") if j.get("confidence") in ("low", "medium", "high") else "low",
             "why": str(j.get("why", ""))[:80], "by": "ai"}
 
+RULE_R = [(r"riding mower|lawn tractor", 150, 600), (r"golf cart", 400, 1500), (r"camper|travel trailer", 300, 1500), (r"utility trailer|trailer", 200, 900),
+          (r"boat", 150, 800), (r"power chair|mobility scooter|wheelchair", 100, 500), (r"hospital bed", 50, 250), (r"shed", 150, 700),
+          (r"hot tub|spa\b", 0, 300), (r"treadmill|elliptical|home gym|exercise bike|weight bench|gym", 40, 250), (r"pressure washer|generator", 40, 200),
+          (r"mower", 30, 150), (r"chain ?saw|leaf blower|trimmer|weed eater", 20, 90), (r"tools?\b|drill|saw\b|compressor|welder", 20, 150),
+          (r"\bbikes?\b|bicycles?", 25, 120), (r"kayak|paddle ?board|canoe", 60, 250), (r"grill|smoker", 20, 120),
+          (r"refrigerator|fridge|freezer", 40, 250), (r"washer|dryer|washing machine", 25, 175), (r"stove|range|oven", 30, 175), (r"dishwasher", 15, 80),
+          (r"\btvs?\b|television|sony|vizio|samsung tv", 15, 90), (r"monitor", 10, 40), (r"receiver|amplifier|speaker", 20, 120), (r"printer|copier", 0, 40),
+          (r"network|switch|router|access point|camera", 10, 80), (r"laptop|computer|\bpc\b|xbox|playstation|ps[345]|nintendo", 30, 200),
+          (r"vinyl|records", 20, 150), (r"piano|organ", 0, 0), (r"dresser|cabinet|hutch|desk|table", 10, 80), (r"pallets?", 0, 10), (r"tires?", 0, 40)]
+
 def rule_estimate(title):
     t = title.lower()
-    for rx, w, m in RULE_W:
-        if re.search(rx, t): return {"rl": 0, "rh": 0, "w": w, "m": m, "cf": "low", "why": "typical weight for this kind of item", "by": "rule"}
-    return None
+    w, m = 0, "none"
+    for rx, ww, mm in RULE_W:
+        if re.search(rx, t): w, m = ww, mm; break
+    rl = rh = 0
+    for rx, a, b in RULE_R:
+        if re.search(rx, t): rl, rh = a, b; break
+    if not w and not rh: return None
+    return {"rl": rl, "rh": rh, "w": w, "m": m, "cf": "low", "why": "typical price and weight for this kind of item", "by": "rule"}
 
 AI_NOTE = {}
 def add_values(items, seed):
