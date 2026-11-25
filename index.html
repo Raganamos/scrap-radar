@@ -57,6 +57,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 <div id="set">
   <div class="row"><b style="font-size:13px">PC link:</b><span id="linkstate" style="font-size:13px;color:var(--mut)"></span><button id="ping">Check PC</button><button id="unlink">Unlink</button></div>
   <div class="row" id="alertrow" style="display:none"><span style="font-size:13px;color:var(--mut)">Phone alerts: install the free <b>ntfy</b> app, then</span><a id="alertlink" class="chip" style="background:var(--go);color:#04130a;text-decoration:none;font-weight:600">Subscribe in ntfy</a><button id="copytopic" class="chip">Copy topic</button></div>
+  <div class="row" id="retellrow"><span style="font-size:13px;color:var(--mut);flex:1 1 100%">Net Hero calling: paste the Retell API key (Retell dashboard → Settings → API Keys). It goes to your PC encrypted and is stored only there.</span><input id="rkey" type="password" autocomplete="off" placeholder="key_…" style="flex:1 1 160px"><button id="rsave">Connect</button><button id="rtest">Test call to me</button></div>
   <div class="row"><label>Truck mpg <input id="mpg" type="number" inputmode="decimal" step="0.5" min="1" style="width:80px"></label><label>Gas $/gal <input id="gas" type="number" inputmode="decimal" step="0.05" min="0" style="width:80px"></label></div>
   <div style="font-size:13px;color:var(--mut);margin-top:6px">Show these kinds of listings (tap to switch off):</div>
   <div class="chips" id="cats" style="margin:6px 0"></div>
@@ -150,13 +151,14 @@ function onReply(o){
   else if(o.c==='watches'){watchList=o.list||[];if(o.added)toast('Watching. You will get an alert when something new matches.')}
   else if(o.c==='watch_hits'){hits=o.items||[]}
   else if(o.c==='check'){calls[o.id]=Object.assign({},o,{t:o.t||Date.now()});if(o.status==='done')toast('Call-ahead finished: '+({yes:'available',no:'gone',not_reached:'no answer',unsure:'unclear'}[o.available]||o.available),6000)}
+  else if(o.c==='retell'){toast(o.note,7000);if(o.ok){pc.retell=true;$('rkey').value=''}}
   else if(o.c==='scan_started'){toast('Your PC is scanning now…')}
   else if(o.c==='scan_busy'){toast('A scan is already running.')}
   else if(o.c==='scan_done'){toast('Scan finished: '+(o.count||'?')+' listings');load(true)}
   LS('sr_pc',pc);LS('sr_watches',watchList);LS('sr_hits',hits);LS('sr_calls',calls);updateLinkUI();render()}
 function updateLinkUI(){const on=link&&pc&&pc.last&&Date.now()-pc.last<6*60e3;
   $('linkstate').innerHTML=link?(pc&&pc.last?`<span class="dot ${on?'on':''}"></span>PC last heard ${age(new Date(pc.last).toISOString())}${pc.retell?' · Net Hero calling connected':' · Net Hero calling not connected yet'}`:'Linked; waiting for the PC to answer'):'Not linked. Open the pairing link sent to you once on this phone.';
-  $('rescan').disabled=$('sgo').disabled=$('swatch').disabled=!link;
+  $('rescan').disabled=$('sgo').disabled=$('swatch').disabled=$('rsave').disabled=$('rtest').disabled=!link;
   if(link){$('alertrow').style.display='flex';$('alertlink').href='ntfy://ntfy.sh/'+link.alerts}}
 
 /* ---------- route planner ---------- */
@@ -220,7 +222,7 @@ function render(){
     if(me)rows=rows.filter(i=>i.dm<=r||run.includes(i.id))}
   else if(mode==='search'){rows=(search&&search.items||[]).filter(keep).map(enrich);pinColor='#a78bfa'}
   else if(mode==='watches'){rows=hits.filter(keep).map(enrich);pinColor='#a78bfa'}
-  else if(mode==='calls'){rows=Object.entries(calls).sort((a,b)=>(b[1].t||0)-(a[1].t||0)).map(([k])=>lookup(k)).filter(Boolean).map(enrich)}
+  else if(mode==='calls'){const tc=calls['test-call'];if(tc&&!lookup('test-call'))runItems['test-call']={id:'test-call',t:'Test call to your phone',h:'',u:'#',src:'test',la:28.04,lo:-81.95,c:'test',s:1};rows=Object.entries(calls).sort((a,b)=>(b[1].t||0)-(a[1].t||0)).map(([k])=>lookup(k)).filter(Boolean).map(enrich)}
   const sort=$('sort').value,when=i=>new Date(i.posted||i.first||0).getTime();
   if(mode!=='calls')rows.sort(sort==='net'?(a,b)=>b.net-a.net:sort==='val'?(a,b)=>((b.v&&b.v.best)||0)-((a.v&&a.v.best)||0):sort==='new'?(a,b)=>when(b)-when(a):(a,b)=>me?a.dm-b.dm:(b.s||0)-(a.s||0));
   pins.clearLayers();
@@ -282,6 +284,8 @@ $('sq').addEventListener('keydown',e=>{if(e.key==='Enter')$('sgo').click()});
 $('swatch').onclick=()=>{const a=searchArgs();if(!a.q)return toast('Type what to watch for first');send({c:'watch_add',q:a.q,max:a.free?0:a.max,free:a.free,r:a.r,la:a.la,lo:a.lo});toast('Setting up the watch…')};
 ['sq','smax','srad'].forEach(k=>$(k).addEventListener('input',renderLinks));
 $('rescan').onclick=()=>send({c:'rescan'});
+$('rsave').onclick=()=>{const k=$('rkey').value.trim();if(!k)return toast('Paste the key first');send({c:'set_retell',key:k});toast('Sent to your PC, checking the key…')};
+$('rtest').onclick=()=>{send({c:'test_call'});toast('Your PC will have Net Hero call your phone as a pretend seller')};
 $('ping').onclick=()=>{send({c:'ping'});toast('Asked your PC to check in')};
 $('unlink').onclick=()=>{localStorage.removeItem('sr_pair');link=null;if(es)es.close();updateLinkUI();render()};
 $('copytopic').onclick=async()=>{try{await navigator.clipboard.writeText(link.alerts);toast('Topic copied: paste it into ntfy → Subscribe')}catch(e){toast(link.alerts,8000)}};
