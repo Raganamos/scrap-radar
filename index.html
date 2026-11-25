@@ -69,8 +69,10 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 <div class="panel show" id="p-radar"><div class="bar">
   <select id="rad" aria-label="Range"><option value="2">2 mi</option><option value="5">5 mi</option><option value="10" selected>10 mi</option><option value="25">25 mi</option><option value="999">Any distance</option></select>
   <select id="min" aria-label="Minimum value"><option value="5">Top value only</option><option value="4" selected>Good and up</option><option value="3">Include materials</option><option value="1">Everything</option></select>
+  <select id="price" aria-label="Price"><option value="0">Free only</option><option value="10">Free + under $10</option><option value="25">Free + under $25</option><option value="40" selected>Free + cheap (under $40)</option><option value="cheap">Cheap only (paid, under $40)</option><option value="any">Any price</option></select>
+  <select id="kind" aria-label="Listing type"><option value="items" selected>Items only (no stores, no yard sales)</option><option value="yard">Items + yard &amp; estate sales</option><option value="yardonly">Yard &amp; estate sales only</option></select>
   <select id="src" aria-label="Source"><option value="">All sources</option><option value="cl">Craigslist</option><option value="ou">OfferUp</option><option value="tn">Trash Nothing</option><option value="fb">Facebook</option><option value="nd">Nextdoor</option></select>
-  <select id="sort" aria-label="Sort"><option value="near">Nearest first</option><option value="net">Best payoff first</option><option value="val">Highest value first</option><option value="new">Newest first</option></select>
+  <select id="sort" aria-label="Sort"><option value="near">Nearest first</option><option value="net">Best payoff first</option><option value="val">Highest value first</option><option value="new">Newest first</option><option value="cheap">Free first, then cheapest</option><option value="roi">Best value per dollar spent</option></select>
   <input id="q" type="search" placeholder="Filter these" aria-label="Filter listings" style="flex:1 1 120px">
   <button id="autoplan" class="go">Plan my run</button><button id="rescan" disabled>Scan now</button><button id="voice">Voice alerts off</button><button id="recenter">Center on me</button>
 </div></div>
@@ -104,7 +106,7 @@ let items=[],me=null,meManual=false,voice=false,scanned=null,statusOk=true,follo
 let hidden=new Set(LS('sr_hidden')||[]),run=LS('sr_run')||[],seen=new Set(LS('sr_seen')||[]),announced=new Set(),home=LS('sr_home');
 let runItems=LS('sr_runitems')||{},search=LS('sr_search')||null,watchList=LS('sr_watches')||[],hits=LS('sr_hits')||[],calls=LS('sr_calls')||{},pc=LS('sr_pc')||null;
 const firstRun=!LS('sr_seen');
-let cfg=Object.assign({mpg:15,gas:3.1,rad:'10',min:'4',sort:'near',off:[],block:''},LS('sr_cfg')||{}),haul=LS('sr_haul')||[];
+let cfg=Object.assign({mpg:15,gas:3.1,rad:'10',min:'4',sort:'near',price:'40',kind:'items',off:[],block:''},LS('sr_cfg')||{}),haul=LS('sr_haul')||[];
 const trip=mi=>mi*1.3/cfg.mpg*cfg.gas, money=n=>'$'+Math.round(n).toLocaleString();
 function dist(a,b,c,d){const x=rad(d-b)*Math.cos(rad((a+c)/2)),y=rad(c-a);return Math.sqrt(x*x+y*y)*R}
 function bearing(a,b,c,d){const y=Math.sin(rad(d-b))*Math.cos(rad(c)),x=Math.cos(rad(a))*Math.sin(rad(c))-Math.sin(rad(a))*Math.cos(rad(c))*Math.cos(rad(d-b));return ['N','NE','E','SE','S','SW','W','NW'][Math.round(((Math.atan2(y,x)*180/Math.PI)+360)%360/45)%8]}
@@ -195,7 +197,16 @@ function renderRun(){
 }
 
 /* ---------- listing cards ---------- */
+const BIZ=/\d{1,2}\s?%\s?off|\bon sale\b|\bsale on\b|\bsale\s*:|super sale|black friday|cyber monday|dollar down|come in today|financ|wholesale|factory direct|warehouse (sale|event)|largest|thousands of pieces|many to choose|starting at|floor stock|\bservices\b|welding service|camera installs|installation|tv mounting|repairs?\b|specialist|handyman|remodeling|pressure washing|painting services|paying cash|cash (for|4)|we (will )?buy|we pay|\bbuying\b|hauled away for|\bhauling\b|junk removal|we haul|shop local|small business|body shop|thrift store|boutique|free shipping|buy now|best deal|grand opening|call (now|today)|appointment|free (estimate|quote)s?|delivered to you|delivery available|in stock|\bdealer|\bpart ?out/i;
+const YARD=/(yard|garage|gsrage|estate|moving|multi-?family|community|rummage|tag|clear ?out|clearance|shutdown|liquidation|closing|warehouse|clothing|plant)\s+sale|sale encore|closing down|liquidate|^\W*(for ?sale|garage sale|yard sale|moving sale|everything for sale)\W*$|things for sale|forsale/i;
+const normT=t=>(t||'').toLowerCase().replace(/[^a-z]+/g,' ').trim().slice(0,40);
+let adT=new Set(LS('sr_adtitles')||[]);
+const SCAM=/^\W*(free\s+)?(iphone|ipad|macbook|airpods|apple watch|playstation 5|ps5|xbox series|nintendo switch|galaxy s2\d)\b.{0,15}$/i;
+function kindOf(i){if(i.k==='biz'||i.p===1||(!(i.p>0)&&SCAM.test(i.t)&&!/broken|cracked|parts|not working|damaged|box(es)? only|case/i.test(i.t))||/years old\?|roof (replacement|inspection|repair)/i.test(i.t)||BIZ.test(i.t)||adT.has(normT(i.t)))return'biz';if(i.k==='yard'||YARD.test(i.t))return'yard';return''}
+function priceOk(i,pv){const p=i.p||0;if(pv==='any')return true;if(pv==='cheap')return p>=2&&p<=40;return p<=+pv}
+function kindOk(i,kv){const k=kindOf(i);if(k==='biz')return false;if(kv==='yardonly')return k==='yard';return kv==='yard'||k!=='yard'}
 function blockRe(){const w=cfg.block.split(',').map(s=>s.trim()).filter(Boolean).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));return w.length?new RegExp('\\b('+w.join('|')+')','i'):null}
+function roi(i){const b=(i.v&&i.v.best)||0;return (b-(i.p||0)-(i.fuel||0))/Math.max(1,(i.p||0)+(i.fuel||0))}
 function enrich(i){const dm=me?dist(me.la,me.lo,i.la,i.lo):null,best=(i.v&&i.v.best)||0,fuel=dm==null?0:trip(dm*2);return{...i,dm,fuel,net:best-(i.p||0)-fuel}}
 function etaFor(i){if(i.dm==null)return'today';const t=new Date(Date.now()+(i.dm*1.3/35*60+20)*60000);t.setMinutes(Math.ceil(t.getMinutes()/15)*15,0,0);
   if(t.getDate()!==new Date().getDate()||t.getHours()>=21)return'tomorrow morning';if(t.getHours()<8)return'later this morning';return'around '+t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
@@ -210,22 +221,22 @@ function callBox(i){const c=calls[i.id];if(!c)return'';const st=c.status;
 function card(i){const isNew=mode==='radar'&&!firstRun&&!seen.has(i.id),inRun=run.includes(i.id),v=i.v;
   const val=v?`<div class="val">${i.p>1?`Asking <b>${money(i.p)}</b> · `:''}${v.rh?`Resale about <b>${money(v.rl)}–${money(v.rh)}</b>`:''}${v.rh&&v.sc?' · ':''}${v.sc?`Scrap about <b>${money(v.sc)}</b> (${v.w} lb ${v.m})`:''}${!v.rh&&!v.sc?'No clear value from the title':''}${i.dm!=null&&(v.best||i.p)?` · gas ${money(i.fuel)} round trip → <b class="${i.net<0?'neg':''}">net ${i.net<0?'-':''}${money(Math.abs(i.net))}</b>`:''}<br><span style="color:var(--mut);font-size:12px">${v.by==='ai'?'AI estimate from the title':'Rule-of-thumb weight'} · ${v.cf} confidence${v.why?' · '+esc(v.why):''}</span></div>`:(i.p?`<div class="val">Asking <b>${money(i.p)}</b> · value estimate coming</div>`:'');
   return `<div class="card s${i.s||1}${isNew?' new':''}${inRun?' in':''}">${i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}${v&&v.best?`<small>worth ~${money(v.best)}</small>`:''}</div>`:''}${i.img?`<img class="thumb" loading="lazy" alt="" src="${esc(i.img)}">`:''}<div class="t">${esc(i.t)}</div>
-    <div class="m"><span class="tag">${esc(i.c||'item')}</span><span class="tag">${SRC[i.src]||'Craigslist'}</span>${i.watch?`<span class="tag" style="color:var(--srch)">watch: ${esc(i.watch)}</span>`:''}${isNew?'<span class="tag" style="color:#4ade80">new</span>':''}${esc(i.h)} · ${i.px==='exact'?'pin exact':'pin approximate'}${i.posted?' · posted '+age(i.posted):''}</div>
+    <div class="m">${i.p>0?`<span class="tag" style="color:#fbbf24">$${Math.round(i.p)}</span>`:'<span class="tag" style="color:#4ade80">free</span>'}${kindOf(i)==='yard'?'<span class="tag" style="color:#fb923c">yard sale</span>':''}<span class="tag">${esc(i.c||'item')}</span><span class="tag">${SRC[i.src]||'Craigslist'}</span>${i.watch?`<span class="tag" style="color:var(--srch)">watch: ${esc(i.watch)}</span>`:''}${isNew?'<span class="tag" style="color:#4ade80">new</span>':''}${esc(i.h)} · ${i.px==='exact'?'pin exact':'pin approximate'}${i.posted?' · posted '+age(i.posted):''}</div>
     ${i.n?`<div class="n">${esc(i.n)}</div>`:''}${val}${callBox(i)}
-    <div class="acts"><button class="${inRun?'':'add'}" data-run="${esc(i.id)}">${inRun?'Remove from run':'Add to run'}</button>${i.src==='cl'||!i.src?`<button data-check="${esc(i.id)}">Check availability</button>`:''}<button data-msg="${esc(i.id)}">Message</button><a href="https://www.google.com/maps/dir/?api=1&destination=${i.la},${i.lo}" target="_blank" rel="noopener">Navigate</a><a href="${esc(i.u)}" target="_blank" rel="noopener">Listing</a><button data-got="${esc(i.id)}">Got it</button><button data-hide="${esc(i.id)}">Gone / skip</button></div></div>`}
+    <div class="acts"><button class="${inRun?'':'add'}" data-run="${esc(i.id)}">${inRun?'Remove from run':'Add to run'}</button>${i.src==='cl'||!i.src?`<button data-check="${esc(i.id)}">Check availability</button>`:''}<button data-msg="${esc(i.id)}">Message</button><a href="https://www.google.com/maps/dir/?api=1&destination=${i.la},${i.lo}" target="_blank" rel="noopener">Navigate</a><a href="${esc(i.u)}" target="_blank" rel="noopener">Listing</a><button data-got="${esc(i.id)}">Got it</button><button data-hide="${esc(i.id)}">Gone / skip</button><button data-ad="${esc(i.id)}" title="Hide this and every listing with the same title">Ad / spam</button></div></div>`}
 
 /* ---------- main render ---------- */
 function render(){
-  const br=blockRe(),keep=i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t));
+  const br=blockRe(),keep=i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)!=='biz';
   let rows=[],pinColor=null;
-  if(mode==='radar'){const r=+$('rad').value,min=+$('min').value,src=$('src').value,q=$('q').value.trim().toLowerCase();
-    rows=items.filter(i=>run.includes(i.id)||(keep(i)&&i.s>=min&&(!src||i.src===src)&&(!q||(i.t+' '+i.h).toLowerCase().includes(q)))).map(enrich);
+  if(mode==='radar'){const r=+$('rad').value,min=+$('min').value,src=$('src').value,q=$('q').value.trim().toLowerCase(),pv=$('price').value,kv=$('kind').value;
+    rows=items.filter(i=>run.includes(i.id)||(keep(i)&&priceOk(i,pv)&&kindOk(i,kv)&&(kv==='yardonly'||i.s>=min)&&(!src||i.src===src)&&(!q||(i.t+' '+i.h).toLowerCase().includes(q)))).map(enrich);
     if(me)rows=rows.filter(i=>i.dm<=r||run.includes(i.id))}
   else if(mode==='search'){rows=(search&&search.items||[]).filter(keep).map(enrich);pinColor='#a78bfa'}
   else if(mode==='watches'){rows=hits.filter(keep).map(enrich);pinColor='#a78bfa'}
   else if(mode==='calls'){const tc=calls['test-call'];if(tc&&!lookup('test-call'))runItems['test-call']={id:'test-call',t:'Test call to your phone',h:'',u:'#',src:'test',la:28.04,lo:-81.95,c:'test',s:1};rows=Object.entries(calls).sort((a,b)=>(b[1].t||0)-(a[1].t||0)).map(([k])=>lookup(k)).filter(Boolean).map(enrich)}
   const sort=$('sort').value,when=i=>new Date(i.posted||i.first||0).getTime();
-  if(mode!=='calls')rows.sort(sort==='net'?(a,b)=>b.net-a.net:sort==='val'?(a,b)=>((b.v&&b.v.best)||0)-((a.v&&a.v.best)||0):sort==='new'?(a,b)=>when(b)-when(a):(a,b)=>me?a.dm-b.dm:(b.s||0)-(a.s||0));
+  if(mode!=='calls')rows.sort(sort==='net'?(a,b)=>b.net-a.net:sort==='val'?(a,b)=>((b.v&&b.v.best)||0)-((a.v&&a.v.best)||0):sort==='new'?(a,b)=>when(b)-when(a):sort==='cheap'?(a,b)=>((a.p||0)-(b.p||0))||(me?a.dm-b.dm:0):sort==='roi'?(a,b)=>roi(b)-roi(a):(a,b)=>me?a.dm-b.dm:(b.s||0)-(a.s||0));
   pins.clearLayers();
   rows.forEach(i=>L.circleMarker([i.la,i.lo],{radius:i.px==='exact'?8:6,color:pinColor||color(i.s),weight:2,fillOpacity:i.px==='exact'?.85:.35,dashArray:i.px==='exact'?null:'3'}).addTo(pins)
     .bindPopup(`<b>${esc(i.t)}</b><br>${esc(i.h)}${i.p?' · $'+Math.round(i.p):''}<br><a href="${esc(i.u)}" target="_blank" rel="noopener">Open listing</a>`));
@@ -236,9 +247,10 @@ function render(){
   if(mode==='search'){head=search?`<div class="sum">${search.state==='searching'?'Your PC is searching for "'+esc(search.q)+'"…':search.state==='estimating'?'Results for "'+esc(search.q)+'" · estimating values…':'Results for "'+esc(search.q)+'" · '+rows.length+' shown'}${search.errs&&Object.keys(search.errs).length?' · couldn\'t search '+Object.keys(search.errs).map(k=>SRC[k]).join(', '):''}</div>`:'<div class="empty">Type what you are after and tap "Scan with my PC", or open the search on any site with the buttons above.</div>'}
   if(mode==='watches')head=watchList.length?watchList.map(w=>`<div class="watch"><div><b>${esc(w.q)}</b><div class="m">${w.free?'free only':w.max==null?'any price':'up to $'+w.max} · ${w.r} mi · ${w.hits||0} new matches so far</div></div><button data-unwatch="${esc(w.id)}">Stop</button></div>`).join('')+(rows.length?'<div class="sum">Recent matches</div>':''):`<div class="empty">${link?'No watches yet. Search for something, then tap "Watch this search".':'Link your PC first (Settings ⚙︎).'}</div>`;
   if(mode==='calls'&&!rows.length)head='<div class="empty">No availability checks yet. Tap "Check availability" on a Craigslist listing.</div>';
-  $('list').innerHTML=head+(rows.length?rows.map(card).join(''):(mode==='radar'?`<div class="empty">${me?'Nothing in range at this value level. Widen the range, lower the value filter, or turn categories back on in Settings.':'Waiting for GPS. Tap the map to set your position by hand.'}</div>`:''));
+  $('list').innerHTML=head+(rows.length?rows.map(card).join(''):(mode==='radar'?`<div class="empty">${me?'Nothing in range with these filters. Widen the range, allow cheap items, lower the value filter, or turn categories back on in Settings.':'Waiting for GPS. Tap the map to set your position by hand.'}</div>`:''));
   const on=link&&pc&&pc.last&&Date.now()-pc.last<6*60e3;
-  $('stat').innerHTML=`${mode==='radar'?rows.length+' shown / '+items.length+' tracked':''}${haul.length?` · haul: ${haul.length}, ~${money(haul.reduce((a,h)=>a+h.v,0))}`:''}<br>${link?`<span class="dot ${on?'on':''}"></span>PC ${on?'online':'linked'} · `:''}${me?(meManual?'position set by hand':'GPS live'):'no position yet'} · scan ${scanned?age(scanned):'?'}${statusOk?'':' · <span style="color:#fbbf24">last scan failed</span>'}`;
+  const nFree=items.filter(i=>!(i.p>0)&&kindOf(i)==='').length,nCheap=items.filter(i=>i.p>0&&kindOf(i)==='').length;
+  $('stat').innerHTML=`${mode==='radar'?rows.length+' shown · '+nFree+' free, '+nCheap+' cheap tracked':''}${haul.length?` · haul: ${haul.length}, ~${money(haul.reduce((a,h)=>a+h.v,0))}`:''}<br>${link?`<span class="dot ${on?'on':''}"></span>PC ${on?'online':'linked'} · `:''}${me?(meManual?'position set by hand':'GPS live'):'no position yet'} · scan ${scanned?age(scanned):'?'}${statusOk?'':' · <span style="color:#fbbf24">last scan failed</span>'}`;
   if(mode==='radar'&&me&&!meManual)rows.filter(i=>i.s>=4&&i.dm<=Math.min(+$('rad').value,3)&&!announced.has(i.id)).slice(0,2).forEach(i=>{announced.add(i.id);
     try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
     if(voice&&window.speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance(`${i.t}, ${i.dm.toFixed(1)} miles ${bearing(me.la,me.lo,i.la,i.lo)}`))});
@@ -286,6 +298,7 @@ function renderLinks(){const a=searchArgs(),e=encodeURIComponent(a.q||'free'),pm
 /* ---------- events ---------- */
 document.addEventListener('click',async e=>{const t=e.target.closest('button,[data-mode]');if(!t)return;const d=t.dataset;
   if(d.mode){mode=d.mode;document.querySelectorAll('nav [data-mode]').forEach(b=>b.classList.toggle('on',b===t));['radar','search','watches','calls'].forEach(m=>$('p-'+m).classList.toggle('show',m===mode));if(mode==='watches'||mode==='calls')send({c:'ping'});render();return}
+  if(d.ad){const it=lookup(d.ad);if(it){adT.add(normT(it.t));LS('sr_adtitles',[...adT])}hidden.add(d.ad);run=run.filter(x=>x!==d.ad);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Hidden, along with any repeats of that ad');render()}
   if(d.hide){hidden.add(d.hide);run=run.filter(x=>x!==d.hide);LS('sr_hidden',[...hidden]);LS('sr_run',run);render()}
   if(d.got){const it=lookup(d.got);haul.push({id:d.got,t:it?it.t:'',v:(it&&it.v&&it.v.best)||0,at:Date.now()});LS('sr_haul',haul);hidden.add(d.got);run=run.filter(x=>x!==d.got);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Added to your haul');render()}
   if(d.run){const it=lookup(d.run);if(run.includes(d.run))run=run.filter(x=>x!==d.run);else{run=[...run,d.run];if(it)runItems[d.run]=it}
@@ -303,7 +316,7 @@ $('swatch').onclick=()=>{const a=searchArgs();if(!a.q)return toast('Type what to
 ['sq','smax','srad'].forEach(k=>$(k).addEventListener('input',renderLinks));
 $('autoplan').onclick=()=>{const start=me||home;if(!start)return toast('Waiting for GPS (or tap the map to set where you are)');
   const r=Math.min(+$('rad').value,40),br=blockRe();
-  const pool=items.filter(i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&i.s>=4&&i.v&&i.v.best>=15).map(i=>{const dm=dist(start.la,start.lo,i.la,i.lo);return{...i,dm,net:i.v.best-(i.p||0)-trip(dm*2)}}).filter(i=>i.dm<=r&&i.net>5);
+  const pv=$('price').value,pool=items.filter(i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)===''&&priceOk(i,pv)&&i.s>=4&&i.v&&i.v.best>=15).map(i=>{const dm=dist(start.la,start.lo,i.la,i.lo);return{...i,dm,net:i.v.best-(i.p||0)-trip(dm*2)}}).filter(i=>i.dm<=r&&i.net>5);
   pool.sort((a,b)=>(b.net+(b.px==='exact'?10:0))-(a.net+(a.px==='exact'?10:0)));
   const pick=pool.slice(0,8);if(!pick.length)return toast('Nothing worth the gas in range yet. Widen the range or lower the value filter.');
   run=pick.map(i=>i.id);runItems={};pick.forEach(i=>runItems[i.id]=i);LS('sr_run',run);LS('sr_runitems',runItems);if(home)$('end').value='home';
@@ -316,14 +329,14 @@ $('unlink').onclick=()=>{localStorage.removeItem('sr_pair');link=null;if(es)es.c
 $('copytopic').onclick=async()=>{try{await navigator.clipboard.writeText(link.alerts);toast('Topic copied: paste it into ntfy → Subscribe')}catch(e){toast(link.alerts,8000)}};
 $('cats').innerHTML=CATS.map(c=>`<button class="chip ${cfg.off.includes(c)?'off':''}" data-cat="${c}">${c}</button>`).join('');
 $('cats').onclick=e=>{const c=e.target.dataset.cat;if(!c)return;cfg.off=cfg.off.includes(c)?cfg.off.filter(x=>x!==c):[...cfg.off,c];e.target.classList.toggle('off');LS('sr_cfg',cfg);render()};
-$('rad').value=cfg.rad;$('min').value=cfg.min;$('sort').value=cfg.sort;$('mpg').value=cfg.mpg;$('gas').value=cfg.gas;$('block').value=cfg.block;
-const save=()=>{Object.assign(cfg,{mpg:+$('mpg').value||15,gas:+$('gas').value||0,rad:$('rad').value,min:$('min').value,sort:$('sort').value,block:$('block').value});LS('sr_cfg',cfg);render()};
-['rad','min','sort','mpg','gas','block'].forEach(k=>$(k).onchange=save);$('src').onchange=$('end').onchange=render;$('q').oninput=render;
+$('rad').value=cfg.rad;$('min').value=cfg.min;$('price').value=cfg.price||'40';$('kind').value=cfg.kind||'items';$('sort').value=cfg.sort;$('mpg').value=cfg.mpg;$('gas').value=cfg.gas;$('block').value=cfg.block;
+const save=()=>{Object.assign(cfg,{mpg:+$('mpg').value||15,gas:+$('gas').value||0,rad:$('rad').value,min:$('min').value,price:$('price').value,kind:$('kind').value,sort:$('sort').value,block:$('block').value});LS('sr_cfg',cfg);render()};
+['rad','min','price','kind','sort','mpg','gas','block'].forEach(k=>$(k).onchange=save);$('src').onchange=$('end').onchange=render;$('q').oninput=render;
 $('clear').onclick=()=>{run=[];runItems={};LS('sr_run',run);LS('sr_runitems',runItems);render()};
 $('sethome').onclick=()=>{if(me){home={la:me.la,lo:me.lo};LS('sr_home',home);$('sethome').textContent='Home saved';$('end').value='home';render()}};
 $('recenter').onclick=()=>{follow=true;if(me)map.setView([me.la,me.lo],Math.max(map.getZoom(),11))};
 $('voice').onclick=()=>{voice=!voice;$('voice').textContent='Voice alerts '+(voice?'on':'off');$('voice').classList.toggle('on',voice);if(voice&&window.speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance('Voice alerts on'))};
-$('showhidden').onclick=()=>{hidden=new Set();LS('sr_hidden',[]);render()};
+$('showhidden').onclick=()=>{hidden=new Set();adT=new Set();LS('sr_hidden',[]);LS('sr_adtitles',[]);render()};
 $('resethaul').onclick=()=>{haul=[];LS('sr_haul',haul);render()};
 map.on('click',e=>{if(!me||meManual)setMe(e.latlng.lat,e.latlng.lng,true)});
 if(navigator.geolocation)navigator.geolocation.watchPosition(p=>setMe(p.coords.latitude,p.coords.longitude,false),()=>render(),{enableHighAccuracy:true,maximumAge:15000,timeout:30000});
