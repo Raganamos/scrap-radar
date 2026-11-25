@@ -167,5 +167,23 @@
       "src": "https://lakelandgov.net/departments/public-works/solid-waste/large-bulk-pickups"
     }
   ],
-  "fight_the_blight_url": "https://hcfl.gov/residents/property-owners-and-renters/code-violations/fight-the-blight"
+  "fight_the_blight_url": "https://hcfl.gov/residents/property-owners-and-renters/code-violations/fight-the-blight",
+  "cheap_max": 40,
+  "cheap_queries": [
+    "scrap metal",
+    "copper",
+    "aluminum",
+    "generator",
+    "lawn mower",
+    "pressure washer",
+    "air compressor",
+    "power tools",
+    "welder",
+    "bicycle"
+  ],
+  "cheap_queries_ou": [
+    "scrap",
+    "tools",
+    "mower"
+  ]
 }
