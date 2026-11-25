@@ -62,13 +62,14 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
   <div style="font-size:13px;color:var(--mut);margin-top:6px">Show these kinds of listings (tap to switch off):</div>
   <div class="chips" id="cats" style="margin:6px 0"></div>
   <label style="display:block">Never show listings with these words (comma separated)<textarea id="block" rows="2" style="width:100%;margin-top:4px" placeholder="mattress, couch, crib"></textarea></label>
+  <div id="sysbox" style="font-size:13px;color:var(--mut);margin:8px 0;line-height:1.6"></div>
   <div class="row"><button id="showhidden">Unhide everything</button><button id="resethaul">Reset haul tally</button></div>
 </div>
 
 <div class="panel show" id="p-radar"><div class="bar">
   <select id="rad" aria-label="Range"><option value="2">2 mi</option><option value="5">5 mi</option><option value="10" selected>10 mi</option><option value="25">25 mi</option><option value="999">Any distance</option></select>
   <select id="min" aria-label="Minimum value"><option value="5">Top value only</option><option value="4" selected>Good and up</option><option value="3">Include materials</option><option value="1">Everything</option></select>
-  <select id="src" aria-label="Source"><option value="">All sources</option><option value="cl">Craigslist</option><option value="ou">OfferUp</option><option value="tn">Trash Nothing</option></select>
+  <select id="src" aria-label="Source"><option value="">All sources</option><option value="cl">Craigslist</option><option value="ou">OfferUp</option><option value="tn">Trash Nothing</option><option value="fb">Facebook</option><option value="nd">Nextdoor</option></select>
   <select id="sort" aria-label="Sort"><option value="near">Nearest first</option><option value="net">Best payoff first</option><option value="val">Highest value first</option><option value="new">Newest first</option></select>
   <input id="q" type="search" placeholder="Filter these" aria-label="Filter listings" style="flex:1 1 120px">
   <button id="rescan" disabled>Scan now</button><button id="voice">Voice alerts off</button><button id="recenter">Center on me</button>
@@ -207,7 +208,7 @@ function callBox(i){const c=calls[i.id];if(!c)return'';const st=c.status;
     return `<div class="callres">📞 ${w}${c.pickup_time?' · '+esc(c.pickup_time):''}${c.pickup_details?'<br>'+esc(c.pickup_details):''}${c.notes?'<br><span style="color:var(--mut)">'+esc(c.notes)+'</span>':''}${!c.pickup_time&&c.summary?'<br><span style="color:var(--mut)">'+esc(c.summary)+'</span>':''}${tel}</div>`}
   return `<div class="callres">${esc(c.note||st)}${tel}</div>`}
 function card(i){const isNew=mode==='radar'&&!firstRun&&!seen.has(i.id),inRun=run.includes(i.id),v=i.v;
-  const val=v?`<div class="val">${i.p?`Asking <b>${money(i.p)}</b> · `:''}${v.rh?`Resale about <b>${money(v.rl)}–${money(v.rh)}</b>`:''}${v.rh&&v.sc?' · ':''}${v.sc?`Scrap about <b>${money(v.sc)}</b> (${v.w} lb ${v.m})`:''}${!v.rh&&!v.sc?'No clear value from the title':''}${i.dm!=null&&(v.best||i.p)?` · gas ${money(i.fuel)} round trip → <b class="${i.net<0?'neg':''}">net ${i.net<0?'-':''}${money(Math.abs(i.net))}</b>`:''}<br><span style="color:var(--mut);font-size:12px">${v.by==='ai'?'AI estimate from the title':'Rule-of-thumb weight'} · ${v.cf} confidence${v.why?' · '+esc(v.why):''}</span></div>`:(i.p?`<div class="val">Asking <b>${money(i.p)}</b> · value estimate coming</div>`:'');
+  const val=v?`<div class="val">${i.p>1?`Asking <b>${money(i.p)}</b> · `:''}${v.rh?`Resale about <b>${money(v.rl)}–${money(v.rh)}</b>`:''}${v.rh&&v.sc?' · ':''}${v.sc?`Scrap about <b>${money(v.sc)}</b> (${v.w} lb ${v.m})`:''}${!v.rh&&!v.sc?'No clear value from the title':''}${i.dm!=null&&(v.best||i.p)?` · gas ${money(i.fuel)} round trip → <b class="${i.net<0?'neg':''}">net ${i.net<0?'-':''}${money(Math.abs(i.net))}</b>`:''}<br><span style="color:var(--mut);font-size:12px">${v.by==='ai'?'AI estimate from the title':'Rule-of-thumb weight'} · ${v.cf} confidence${v.why?' · '+esc(v.why):''}</span></div>`:(i.p?`<div class="val">Asking <b>${money(i.p)}</b> · value estimate coming</div>`:'');
   return `<div class="card s${i.s||1}${isNew?' new':''}${inRun?' in':''}">${i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}${v&&v.best?`<small>worth ~${money(v.best)}</small>`:''}</div>`:''}${i.img?`<img class="thumb" loading="lazy" alt="" src="${esc(i.img)}">`:''}<div class="t">${esc(i.t)}</div>
     <div class="m"><span class="tag">${esc(i.c||'item')}</span><span class="tag">${SRC[i.src]||'Craigslist'}</span>${i.watch?`<span class="tag" style="color:var(--srch)">watch: ${esc(i.watch)}</span>`:''}${isNew?'<span class="tag" style="color:#4ade80">new</span>':''}${esc(i.h)} · ${i.px==='exact'?'pin exact':'pin approximate'}${i.posted?' · posted '+age(i.posted):''}</div>
     ${i.n?`<div class="n">${esc(i.n)}</div>`:''}${val}${callBox(i)}
@@ -250,10 +251,18 @@ async function load(fresh){try{
   const url=fresh?'https://api.github.com/repos/Raganamos/scrap-radar/contents/listings.json':'listings.json?t='+Date.now();
   const d=await fetch(url,fresh?{headers:{Accept:'application/vnd.github.raw+json'}}:{}).then(r=>r.json());
   const s=await fetch('status.json?t='+Date.now()).then(r=>r.json()).catch(()=>({ok:true}));
-  items=d.items;scanned=d.scanned;statusOk=s.ok!==false;render();
+  items=d.items;scanned=d.scanned;statusOk=s.ok!==false;sys=s;renderSys();render();
   if(firstRun&&seen.size===0){items.forEach(i=>seen.add(i.id));LS('sr_seen',[...seen])}
 }catch(e){if(fresh)return load(false);$('stat').textContent='Could not load scan data'}}
 
+let sys={};
+function renderSys(){const b=sys.by_source||{},si=sys.signed_in||{},src=sys.sources||{};
+  const f=(n,k)=>`${n} <b style="color:var(--tx)">${b[k]!=null?b[k]:'?'}</b>`;
+  const signed=v=>v==null?'not set up yet (sign in once on the PC)':typeof v==='number'?v+' found last pass':esc(v);
+  $('sysbox').innerHTML=`<b style="color:var(--tx)">Automatic scanning</b> · every 30 min on your PC · last ${sys.at?age(sys.at):'?'}${sys.ok===false?' · <span class="neg">last scan failed</span>':''}<br>
+   Tracked now: ${f('Craigslist','cl')} · ${f('OfferUp','ou')} · ${f('Trash Nothing','tn')} · ${f('Facebook','fb')} · ${f('Nextdoor','nd')}<br>
+   Facebook: ${signed(si.facebook)} · Nextdoor: ${signed(si.nextdoor)}<br>
+   Value estimates: local AI on your PC, ${sys.estimated_this_run!=null?sys.estimated_this_run:'?'} new last scan${Object.values(src).some(v=>typeof v==='string')?'<br><span class="neg">Source errors: '+esc(Object.entries(src).filter(([k,v])=>typeof v==='string').map(([k,v])=>k+' '+v).join('; '))+'</span>':''}`}
 /* ---------- search links ---------- */
 function searchArgs(){const q=$('sq').value.trim(),mx=$('smax').value,r=+$('srad').value;return{q,free:mx==='0',max:mx==='any'?null:+mx,r,la:me?+me.la.toFixed(2):28.04,lo:me?+me.lo.toFixed(2):-81.95}}
 function renderLinks(){const a=searchArgs(),e=encodeURIComponent(a.q||'free'),pm=a.free?0:a.max;
