@@ -77,7 +77,7 @@
     "ewaste": 0.15
   },
   "estimate_model": "qwen3.5:9b",
-  "max_estimates_per_run": 70,
+  "max_estimates_per_run": 150,
   "alert_min_value": 60,
   "call_hours": [
     9,
