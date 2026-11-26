@@ -4,6 +4,7 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#0b100d">
 <title>Scrap Radar</title>
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -12,10 +13,10 @@
 header{padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
 h1{font:700 15px ui-monospace,monospace;letter-spacing:.15em;margin:0;color:var(--go)}
 #stat{font-size:12px;color:var(--mut);text-align:right}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#555;margin-right:4px;vertical-align:middle}.dot.on{background:var(--go)}
-#map{height:40vh;min-height:230px;background:#0e1511}
+#map{height:40vh;min-height:230px;background:#0e1511;position:relative}
 nav{display:flex;border-bottom:1px solid var(--line);background:var(--pan);position:sticky;top:0;z-index:600}
 nav button{flex:1;border:0;border-radius:0;background:none;color:var(--mut);padding:10px 4px;font:600 13.5px system-ui;min-height:44px;border-bottom:3px solid transparent}
-nav button.on{color:var(--go);border-bottom-color:var(--go)}
+nav button.on{color:var(--go);border-bottom-color:var(--go);background:none;border-color:transparent;border-bottom-color:var(--go)}
 .bar{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;background:var(--pan);border-bottom:1px solid var(--line)}
 button,select,input,textarea{background:var(--pan2);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-height:40px;min-width:0}
 button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;border-color:var(--go);font-weight:600}button:disabled{opacity:.45}
@@ -48,10 +49,18 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 .num{background:var(--go);color:#04130a;font:700 12px ui-monospace,monospace;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:2px solid #04130a}
 @keyframes p{0%{box-shadow:0 0 0 0 #38bdf8aa}100%{box-shadow:0 0 0 18px #38bdf800}}
 @media (prefers-reduced-motion:reduce){.me{animation:none}}
+.modes{gap:6px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}.modes button{flex:0 0 auto;border-radius:18px;padding:7px 13px;min-height:38px;font-size:13.5px}
+.fbar{align-items:center}.fbar #fsum{flex:1 1 140px;font-size:12.5px;color:var(--mut);line-height:1.3}
+#adv{display:none}#adv.show{display:flex}
+.hero{border:1px solid var(--go);border-left:4px solid var(--go);background:#10221a}.hero .lbl{font:700 11px ui-monospace,monospace;letter-spacing:.12em;color:var(--go);margin-bottom:4px}
+.card.old{opacity:.72}.tag.fit{color:#fb923c}.tag.also{color:var(--srch)}
+.mapbtn{position:absolute;right:10px;bottom:10px;z-index:800;width:44px;height:44px;border-radius:50%;padding:0;font-size:20px;background:var(--pan);border:1px solid var(--line)}
+.yard{width:14px;height:14px;border-radius:3px;border:2px solid #0b100d}
+#tip{font-size:13px;color:var(--mut);padding:8px 12px;background:#101c14;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}#tip b{color:var(--tx)}
 .leaflet-container{background:#0e1511}.leaflet-tile{filter:brightness(.72) contrast(1.1) saturate(.6)}
 </style></head><body>
 <header><h1>SCRAP RADAR</h1><div id="stat">starting…</div></header>
-<div id="map"></div>
+<div id="map"><button class="mapbtn" id="recenter2" aria-label="Center on me" title="Center on me">◎</button></div>
 <nav><button data-mode="radar" class="on">Radar</button><button data-mode="search">Search</button><button data-mode="watches">Watches</button><button data-mode="calls">Calls</button><button id="setbtn" aria-label="Settings" style="flex:0 0 52px">⚙︎</button></nav>
 
 <div id="set">
@@ -66,7 +75,12 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
   <div class="row"><button id="showhidden">Unhide everything</button><button id="resethaul">Reset haul tally</button></div>
 </div>
 
-<div class="panel show" id="p-radar"><div class="bar">
+<div class="panel show" id="p-radar">
+<div id="tip" style="display:none"><span style="flex:1"><b>Quick start:</b> pick a mode below, then tap <b>Plan my run</b>. On any card: <b>Add to run</b>, <b>Message</b> the seller, or <b>Navigate</b>. Tap <b>Filters</b> to fine-tune.</span><button id="tipx" aria-label="Dismiss">Got it</button></div>
+<div class="bar modes" id="modes"><button data-preset="best">⭐ Best near me</button><button data-preset="free">Free only</button><button data-preset="scrap">Scrap metal</button><button data-preset="flip">Big flips</button><button data-preset="yard">Yard sales</button></div>
+<div class="bar fbar"><button id="advbtn" aria-expanded="false">Filters ▾</button><span id="fsum"></span><button id="autoplan" class="go">Plan my run</button></div>
+<div class="bar" id="adv">
+  <select id="age" aria-label="Posted within"><option value="1">Posted today</option><option value="3">Last 3 days</option><option value="7" selected>Last 7 days</option><option value="any">Any age</option></select>
   <select id="rad" aria-label="Range"><option value="2">2 mi</option><option value="5">5 mi</option><option value="10" selected>10 mi</option><option value="25">25 mi</option><option value="999">Any distance</option></select>
   <select id="min" aria-label="Minimum value"><option value="5">Top value only</option><option value="4" selected>Good and up</option><option value="3">Include materials</option><option value="1">Everything</option></select>
   <select id="price" aria-label="Price"><option value="0">Free only</option><option value="10">Free + under $10</option><option value="25">Free + under $25</option><option value="40" selected>Free + cheap (under $40)</option><option value="cheap">Cheap only (paid, under $40)</option><option value="any">Any price</option></select>
@@ -74,7 +88,8 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
   <select id="src" aria-label="Source"><option value="">All sources</option><option value="cl">Craigslist</option><option value="ou">OfferUp</option><option value="tn">Trash Nothing</option><option value="fb">Facebook</option><option value="nd">Nextdoor</option></select>
   <select id="sort" aria-label="Sort"><option value="near">Nearest first</option><option value="net">Best payoff first</option><option value="val">Highest value first</option><option value="new">Newest first</option><option value="cheap">Free first, then cheapest</option><option value="roi">Best value per dollar spent</option></select>
   <input id="q" type="search" placeholder="Filter these" aria-label="Filter listings" style="flex:1 1 120px">
-  <button id="autoplan" class="go">Plan my run</button><button id="rescan" disabled>Scan now</button><button id="voice">Voice alerts off</button><button id="recenter">Center on me</button>
+  <label style="font-size:13px;color:var(--mut);display:flex;align-items:center;gap:6px"><input type="checkbox" id="yardson" style="min-height:0"> Scrap yards &amp; pawn shops on map</label>
+  <button id="rescan" disabled>Scan now</button><button id="voice">Voice alerts off</button><button id="recenter">Center on me</button><button id="freset">Reset filters</button>
 </div></div>
 
 <div class="panel" id="p-search"><div class="bar">
@@ -90,7 +105,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 <div id="run">
   <h2>My pickup run</h2>
   <div class="bar" style="padding:0;background:none;border:0">
-    <select id="end" aria-label="Where the run ends"><option value="last">End at last stop</option><option value="start">Return to where I am</option><option value="home">End at home</option></select>
+    <select id="end" aria-label="Where the run ends"><option value="last">End at last stop</option><option value="start">Return to where I am</option><option value="home">End at home</option><option value="yard">End at nearest scrap yard</option></select>
     <button id="sethome">Set home = here</button><button id="clear">Clear run</button>
   </div>
   <ol id="stops"></ol><div class="sum" id="sum"></div>
@@ -106,7 +121,7 @@ let items=[],me=null,meManual=false,voice=false,scanned=null,statusOk=true,follo
 let hidden=new Set(LS('sr_hidden')||[]),run=LS('sr_run')||[],seen=new Set(LS('sr_seen')||[]),announced=new Set(),home=LS('sr_home');
 let runItems=LS('sr_runitems')||{},search=LS('sr_search')||null,watchList=LS('sr_watches')||[],hits=LS('sr_hits')||[],calls=LS('sr_calls')||{},pc=LS('sr_pc')||null;
 const firstRun=!LS('sr_seen');
-let cfg=Object.assign({mpg:15,gas:3.1,rad:'10',min:'4',sort:'near',price:'40',kind:'items',off:[],block:''},LS('sr_cfg')||{}),haul=LS('sr_haul')||[];
+let cfg=Object.assign({mpg:15,gas:3.1,rad:'10',min:'4',sort:'near',price:'40',kind:'items',age:'7',focus:'',preset:'best',yards:true,off:[],block:''},LS('sr_cfg')||{}),haul=LS('sr_haul')||[];
 const trip=mi=>mi*1.3/cfg.mpg*cfg.gas, money=n=>'$'+Math.round(n).toLocaleString();
 function dist(a,b,c,d){const x=rad(d-b)*Math.cos(rad((a+c)/2)),y=rad(c-a);return Math.sqrt(x*x+y*y)*R}
 function bearing(a,b,c,d){const y=Math.sin(rad(d-b))*Math.cos(rad(c)),x=Math.cos(rad(a))*Math.sin(rad(c))-Math.sin(rad(a))*Math.cos(rad(c))*Math.cos(rad(d-b));return ['N','NE','E','SE','S','SW','W','NW'][Math.round(((Math.atan2(y,x)*180/Math.PI)+360)%360/45)%8]}
@@ -185,19 +200,20 @@ const lookup=id=>items.find(i=>i.id===id)||(search&&search.items||[]).find(i=>i.
 function renderRun(){
   runLayer.clearLayers();const stops=run.map(lookup).filter(Boolean);
   $('run').style.display=stops.length?'block':'none';if(!stops.length)return;
-  const start=me||{la:stops[0].la,lo:stops[0].lo},m=$('end').value,end=m==='start'?start:m==='home'?home:null;
+  const start=me||{la:stops[0].la,lo:stops[0].lo},m=$('end').value;let end=m==='start'?start:m==='home'?home:null;
+  if(m==='yard'){const ys=(yards||[]).filter(y=>y.k==='scrap'||y.k==='recycle');if(ys.length){const last=plan(start,stops,null).order.slice(-1)[0];end=ys.reduce((a,b)=>dist(last.la,last.lo,b.la,b.lo)<dist(last.la,last.lo,a.la,a.lo)?b:a);end={la:end.la,lo:end.lo,n:end.n}}}
   const p=plan(start,stops,end),path=[[start.la,start.lo],...p.order.map(s=>[s.la,s.lo])];if(end)path.push([end.la,end.lo]);
   L.polyline(path,{color:'#4ade80',weight:4,opacity:.8}).addTo(runLayer);
   p.order.forEach((s,i)=>L.marker([s.la,s.lo],{icon:L.divIcon({className:'',html:`<div class="num">${i+1}</div>`,iconSize:[22,22],iconAnchor:[11,11]}),zIndexOffset:900}).addTo(runLayer).bindPopup(esc(s.t)));
   let prev=start;$('stops').innerHTML=p.order.map(s=>{const leg=dist(prev.la,prev.lo,s.la,s.lo);prev=s;return `<li>${esc(s.t)} <span style="color:var(--mut)">· ${esc(s.h)} · ${leg.toFixed(1)} mi leg${s.p?' · $'+Math.round(s.p):''}</span></li>`}).join('');
   const drive=p.miles*1.3,worth=p.order.reduce((a,s)=>a+((s.v&&s.v.best)||0),0),cost=p.order.reduce((a,s)=>a+(s.p||0),0),fuel=drive/cfg.mpg*cfg.gas;
-  $('sum').textContent=`${p.order.length} stops · about ${drive.toFixed(0)} road miles · worth about ${money(worth)}${cost?', costs '+money(cost):''}, gas about ${money(fuel)} → net about ${money(worth-cost-fuel)}${m==='home'&&!home?' · home not set: tap "Set home = here" when you are home':''}${me?'':' · no GPS yet, starting from the first stop'}${p.order.length>9?' · Google Maps takes 9 stops per link; the link covers the first 9':''}`;
+  $('sum').textContent=`${p.order.length} stops · about ${drive.toFixed(0)} road miles · worth about ${money(worth)}${cost?', costs '+money(cost):''}, gas about ${money(fuel)} → net about ${money(worth-cost-fuel)}${m==='home'&&!home?' · home not set: tap "Set home = here" when you are home':''}${m==='yard'&&end?' · ends at '+esc(end.n||'scrap yard'):''}${m==='yard'&&!end?' · scrap yard list still loading':''}${me?'':' · no GPS yet, starting from the first stop'}${p.order.length>9?' · Google Maps takes 9 stops per link; the link covers the first 9':''}`;
   const o=p.order.slice(0,9),dest=end||o[o.length-1],way=(end?o:o.slice(0,-1)).map(s=>s.la+','+s.lo).join('|');
   $('gmaps').href=`https://www.google.com/maps/dir/?api=1${me?`&origin=${me.la},${me.lo}`:''}&destination=${dest.la},${dest.lo}${way?'&waypoints='+encodeURIComponent(way):''}&travelmode=driving`;
 }
 
 /* ---------- listing cards ---------- */
-const BIZ=/\d{1,2}\s?%\s?off|\bon sale\b|\bsale on\b|\bsale\s*:|super sale|black friday|cyber monday|dollar down|come in today|financ|wholesale|factory direct|warehouse (sale|event)|largest|thousands of pieces|many to choose|starting at|floor stock|\bservices\b|welding service|camera installs|installation|tv mounting|repairs?\b|specialist|handyman|remodeling|pressure washing|painting services|paying cash|cash (for|4)|we (will )?buy|we pay|\bbuying\b|hauled away for|\bhauling\b|junk removal|we haul|shop local|small business|body shop|thrift store|boutique|free shipping|buy now|best deal|grand opening|call (now|today)|appointment|free (estimate|quote)s?|delivered to you|delivery available|in stock|\bdealer|\bpart ?out/i;
+const BIZ=/^\W*\(\(|read ad\b|\d{1,2}\s?%\s?off|\bon sale\b|\bsale on\b|\bsale\s*:|super sale|black friday|cyber monday|dollar down|come in today|financ|wholesale|factory direct|warehouse (sale|event)|largest|thousands of pieces|many to choose|starting at|floor stock|\bservices\b|welding service|camera installs|installation|tv mounting|repairs?\b|specialist|handyman|remodeling|pressure washing|painting services|paying cash|cash (for|4)|we (will )?buy|we pay|\bbuying\b|hauled away for|\bhauling\b|junk removal|we haul|shop local|small business|body shop|thrift store|boutique|free shipping|buy now|best deal|grand opening|call (now|today)|appointment|free (estimate|quote)s?|delivered to you|delivery available|in stock|\bdealer|\bpart ?out/i;
 const YARD=/(yard|garage|gsrage|estate|moving|multi-?family|community|rummage|tag|clear ?out|clearance|shutdown|liquidation|closing|warehouse|clothing|plant)\s+sale|sale encore|closing down|liquidate|^\W*(for ?sale|garage sale|yard sale|moving sale|everything for sale)\W*$|things for sale|forsale/i;
 const normT=t=>(t||'').toLowerCase().replace(/[^a-z]+/g,' ').trim().slice(0,40);
 let adT=new Set(LS('sr_adtitles')||[]);
@@ -206,6 +222,23 @@ function kindOf(i){if(i.k==='biz'||i.p===1||(!(i.p>0)&&SCAM.test(i.t)&&!/broken|
 function priceOk(i,pv){const p=i.p||0;if(pv==='any')return true;if(pv==='cheap')return p>=2&&p<=40;return p<=+pv}
 function kindOk(i,kv){const k=kindOf(i);if(k==='biz')return false;if(kv==='yardonly')return k==='yard';return kv==='yard'||k!=='yard'}
 function blockRe(){const w=cfg.block.split(',').map(s=>s.trim()).filter(Boolean).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));return w.length?new RegExp('\\b('+w.join('|')+')','i'):null}
+const FOCUS={scrap:i=>['scrap','appliance'].includes(i.c)||(i.v&&i.v.m&&i.v.m!=='none'&&(i.v.sc||0)>=5)||/metal|copper|alumin|brass|steel|iron|wire|radiator|catalytic|battery|batteries|motor/i.test(i.t),
+  flip:i=>['resale','vehicle','electronics','appliance'].includes(i.c)&&((i.v&&i.v.best)||0)>=40};
+const PRESETS={best:{price:'40',kind:'items',min:'4',sort:'net',focus:'',age:'7'},free:{price:'0',kind:'items',min:'2',sort:'near',focus:'',age:'7'},
+  scrap:{price:'40',kind:'items',min:'1',sort:'net',focus:'scrap',age:'7'},flip:{price:'40',kind:'items',min:'3',sort:'val',focus:'flip',age:'7'},
+  yard:{price:'any',kind:'yardonly',min:'1',sort:'near',focus:'',age:'3'}};
+function applyPreset(k){const p=PRESETS[k];if(!p)return;['price','kind','min','sort','age'].forEach(f=>$(f).value=p[f]);cfg.focus=p.focus;cfg.preset=k;save()}
+function when(i){return new Date(i.posted||i.first||0).getTime()}
+function ageOk(i,av){return av==='any'||Date.now()-when(i)<=+av*864e5}
+const FIT_T=/\bshed\b|hot tub|\bspa\b|camper|travel trailer|\bboat\b|piano|\borgan\b|golf cart|riding mower|lawn tractor|pool table|\bsafe\b|tractor|trailer|playset|play ?system|swing set|trampoline/i,
+      FIT_2=/fridge|refrigerator|freezer|washer|dryer|washing machine|treadmill|elliptical|dresser|armoire|stove|\brange\b|oven|hutch|china cabinet|entertainment center|gym|sectional|bunk|water heater|tv stand|desk/i;
+function fit(i){return FIT_T.test(i.t)?'trailer?':FIT_2.test(i.t)?'2 people':''}
+function dedupe(rows){const keep=[],byKey={};rows.slice().sort((a,b)=>(b.px==='exact')-(a.px==='exact')||((b.v&&b.v.by==='ai')-(a.v&&a.v.by==='ai'))).forEach(i=>{const k=normT(i.t);if(k.length<6){keep.push(i);return}
+  const twin=(byKey[k]||[]).find(j=>dist(i.la,i.lo,j.la,j.lo)<3);if(twin){(twin.also=twin.also||[]).push(i.src);return}(byKey[k]=byKey[k]||[]).push(i);keep.push(i)});return keep}
+function heroPick(rows){const c=rows.filter(i=>!run.includes(i.id)&&i.dm!=null&&i.v&&i.v.best>=20&&i.net>10&&kindOf(i)==='');if(!c.length)return null;
+  const sc=i=>i.net+(i.px==='exact'?10:0)-Math.min(20,(Date.now()-when(i))/864e5*3);return c.reduce((a,b)=>sc(b)>sc(a)?b:a)}
+function fsumText(){const o=t=>$(t).selectedOptions[0].textContent;const pr={best:'⭐ Best near me',free:'Free only',scrap:'Scrap metal',flip:'Big flips',yard:'Yard sales'}[cfg.preset];
+  return `${pr?'<b style="color:var(--tx)">'+pr+'</b> · ':''}${cfg.preset==='free'?'':o('price')+' · '}${o('rad')} · ${o('age').toLowerCase()} · ${o('sort').toLowerCase()}${$('src').value?' · '+o('src'):''}${$('q').value?' · "'+esc($('q').value)+'"':''}`}
 function roi(i){const b=(i.v&&i.v.best)||0;return (b-(i.p||0)-(i.fuel||0))/Math.max(1,(i.p||0)+(i.fuel||0))}
 function enrich(i){const dm=me?dist(me.la,me.lo,i.la,i.lo):null,best=(i.v&&i.v.best)||0,fuel=dm==null?0:trip(dm*2);return{...i,dm,fuel,net:best-(i.p||0)-fuel}}
 function etaFor(i){if(i.dm==null)return'today';const t=new Date(Date.now()+(i.dm*1.3/35*60+20)*60000);t.setMinutes(Math.ceil(t.getMinutes()/15)*15,0,0);
@@ -218,10 +251,10 @@ function callBox(i){const c=calls[i.id];if(!c)return'';const st=c.status;
   if(st==='done'){const w={yes:'<b>Available</b>',no:'<span class="neg">Gone</span>',not_reached:'No answer',unsure:'Unclear'}[c.available]||esc(c.available);
     return `<div class="callres">📞 ${w}${c.pickup_time?' · '+esc(c.pickup_time):''}${c.pickup_details?'<br>'+esc(c.pickup_details):''}${c.notes?'<br><span style="color:var(--mut)">'+esc(c.notes)+'</span>':''}${!c.pickup_time&&c.summary?'<br><span style="color:var(--mut)">'+esc(c.summary)+'</span>':''}${tel}</div>`}
   return `<div class="callres">${esc(c.note||st)}${tel}</div>`}
-function card(i){const isNew=mode==='radar'&&!firstRun&&!seen.has(i.id),inRun=run.includes(i.id),v=i.v;
+function card(i){const old=Date.now()-when(i)>3*864e5,ft=fit(i);const isNew=mode==='radar'&&!firstRun&&!seen.has(i.id),inRun=run.includes(i.id),v=i.v;
   const val=v?`<div class="val">${i.p>1?`Asking <b>${money(i.p)}</b> · `:''}${v.rh?`Resale about <b>${money(v.rl)}–${money(v.rh)}</b>`:''}${v.rh&&v.sc?' · ':''}${v.sc?`Scrap about <b>${money(v.sc)}</b> (${v.w} lb ${v.m})`:''}${!v.rh&&!v.sc?'No clear value from the title':''}${i.dm!=null&&(v.best||i.p)?` · gas ${money(i.fuel)} round trip → <b class="${i.net<0?'neg':''}">net ${i.net<0?'-':''}${money(Math.abs(i.net))}</b>`:''}<br><span style="color:var(--mut);font-size:12px">${v.by==='ai'?'AI estimate from the title':'Rule-of-thumb weight'} · ${v.cf} confidence${v.why?' · '+esc(v.why):''}</span></div>`:(i.p?`<div class="val">Asking <b>${money(i.p)}</b> · value estimate coming</div>`:'');
-  return `<div class="card s${i.s||1}${isNew?' new':''}${inRun?' in':''}">${i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}${v&&v.best?`<small>worth ~${money(v.best)}</small>`:''}</div>`:''}${i.img?`<img class="thumb" loading="lazy" alt="" src="${esc(i.img)}">`:''}<div class="t">${esc(i.t)}</div>
-    <div class="m">${i.p>0?`<span class="tag" style="color:#fbbf24">$${Math.round(i.p)}</span>`:'<span class="tag" style="color:#4ade80">free</span>'}${kindOf(i)==='yard'?'<span class="tag" style="color:#fb923c">yard sale</span>':''}<span class="tag">${esc(i.c||'item')}</span><span class="tag">${SRC[i.src]||'Craigslist'}</span>${i.watch?`<span class="tag" style="color:var(--srch)">watch: ${esc(i.watch)}</span>`:''}${isNew?'<span class="tag" style="color:#4ade80">new</span>':''}${esc(i.h)} · ${i.px==='exact'?'pin exact':'pin approximate'}${i.posted?' · posted '+age(i.posted):''}</div>
+  return `<div class="card s${i.s||1}${isNew?' new':''}${inRun?' in':''}${old?' old':''}">${i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}${v&&v.best?`<small>worth ~${money(v.best)}</small>`:''}</div>`:''}${i.img?`<img class="thumb" loading="lazy" alt="" src="${esc(i.img)}">`:''}<div class="t">${esc(i.t)}</div>
+    <div class="m">${i.p>0?`<span class="tag" style="color:#fbbf24">$${Math.round(i.p)}</span>`:'<span class="tag" style="color:#4ade80">free</span>'}${kindOf(i)==='yard'?'<span class="tag" style="color:#fb923c">yard sale</span>':''}<span class="tag">${esc(i.c||'item')}</span><span class="tag">${SRC[i.src]||'Craigslist'}</span>${i.also&&i.also.length?`<span class="tag also">also on ${[...new Set(i.also)].map(x=>SRC[x]||x).join(', ')}</span>`:''}${ft?`<span class="tag fit">${ft}</span>`:''}${i.watch?`<span class="tag" style="color:var(--srch)">watch: ${esc(i.watch)}</span>`:''}${isNew?'<span class="tag" style="color:#4ade80">new</span>':''}${esc(i.h)} · ${i.px==='exact'?'pin exact':'pin approximate'}${i.posted?' · posted '+age(i.posted):''}</div>
     ${i.n?`<div class="n">${esc(i.n)}</div>`:''}${val}${callBox(i)}
     <div class="acts"><button class="${inRun?'':'add'}" data-run="${esc(i.id)}">${inRun?'Remove from run':'Add to run'}</button>${i.src==='cl'||!i.src?`<button data-check="${esc(i.id)}">Check availability</button>`:''}<button data-msg="${esc(i.id)}">Message</button><a href="https://www.google.com/maps/dir/?api=1&destination=${i.la},${i.lo}" target="_blank" rel="noopener">Navigate</a><a href="${esc(i.u)}" target="_blank" rel="noopener">Listing</a><button data-got="${esc(i.id)}">Got it</button><button data-hide="${esc(i.id)}">Gone / skip</button><button data-ad="${esc(i.id)}" title="Hide this and every listing with the same title">Ad / spam</button></div></div>`}
 
@@ -230,12 +263,13 @@ function render(){
   const br=blockRe(),keep=i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)!=='biz';
   let rows=[],pinColor=null;
   if(mode==='radar'){const r=+$('rad').value,min=+$('min').value,src=$('src').value,q=$('q').value.trim().toLowerCase(),pv=$('price').value,kv=$('kind').value;
-    rows=items.filter(i=>run.includes(i.id)||(keep(i)&&priceOk(i,pv)&&kindOk(i,kv)&&(kv==='yardonly'||i.s>=min)&&(!src||i.src===src)&&(!q||(i.t+' '+i.h).toLowerCase().includes(q)))).map(enrich);
+    const av=$('age').value,fo=FOCUS[cfg.focus];
+    rows=dedupe(items.map(i=>({...i,also:null})).filter(i=>run.includes(i.id)||(keep(i)&&priceOk(i,pv)&&kindOk(i,kv)&&ageOk(i,av)&&(kv==='yardonly'||i.s>=min)&&(!fo||fo(i))&&(!src||i.src===src)&&(!q||(i.t+' '+i.h).toLowerCase().includes(q))))).map(enrich);
     if(me)rows=rows.filter(i=>i.dm<=r||run.includes(i.id))}
   else if(mode==='search'){rows=(search&&search.items||[]).filter(keep).map(enrich);pinColor='#a78bfa'}
   else if(mode==='watches'){rows=hits.filter(keep).map(enrich);pinColor='#a78bfa'}
   else if(mode==='calls'){const tc=calls['test-call'];if(tc&&!lookup('test-call'))runItems['test-call']={id:'test-call',t:'Test call to your phone',h:'',u:'#',src:'test',la:28.04,lo:-81.95,c:'test',s:1};rows=Object.entries(calls).sort((a,b)=>(b[1].t||0)-(a[1].t||0)).map(([k])=>lookup(k)).filter(Boolean).map(enrich)}
-  const sort=$('sort').value,when=i=>new Date(i.posted||i.first||0).getTime();
+  const sort=$('sort').value;
   if(mode!=='calls')rows.sort(sort==='net'?(a,b)=>b.net-a.net:sort==='val'?(a,b)=>((b.v&&b.v.best)||0)-((a.v&&a.v.best)||0):sort==='new'?(a,b)=>when(b)-when(a):sort==='cheap'?(a,b)=>((a.p||0)-(b.p||0))||(me?a.dm-b.dm:0):sort==='roi'?(a,b)=>roi(b)-roi(a):(a,b)=>me?a.dm-b.dm:(b.s||0)-(a.s||0));
   pins.clearLayers();
   rows.forEach(i=>L.circleMarker([i.la,i.lo],{radius:i.px==='exact'?8:6,color:pinColor||color(i.s),weight:2,fillOpacity:i.px==='exact'?.85:.35,dashArray:i.px==='exact'?null:'3'}).addTo(pins)
@@ -247,6 +281,8 @@ function render(){
   if(mode==='search'){head=search?`<div class="sum">${search.state==='searching'?'Your PC is searching for "'+esc(search.q)+'"…':search.state==='estimating'?'Results for "'+esc(search.q)+'" · estimating values…':'Results for "'+esc(search.q)+'" · '+rows.length+' shown'}${search.errs&&Object.keys(search.errs).length?' · couldn\'t search '+Object.keys(search.errs).map(k=>SRC[k]).join(', '):''}</div>`:'<div class="empty">Type what you are after and tap "Scan with my PC", or open the search on any site with the buttons above.</div>'}
   if(mode==='watches')head=watchList.length?watchList.map(w=>`<div class="watch"><div><b>${esc(w.q)}</b><div class="m">${w.free?'free only':w.max==null?'any price':'up to $'+w.max} · ${w.r} mi · ${w.hits||0} new matches so far</div></div><button data-unwatch="${esc(w.id)}">Stop</button></div>`).join('')+(rows.length?'<div class="sum">Recent matches</div>':''):`<div class="empty">${link?'No watches yet. Search for something, then tap "Watch this search".':'Link your PC first (Settings ⚙︎).'}</div>`;
   if(mode==='calls'&&!rows.length)head='<div class="empty">No availability checks yet. Tap "Check availability" on a Craigslist listing.</div>';
+  if(mode==='radar'){const h=me&&heroPick(rows);if(h){head+=`<div class="card hero"><div class="lbl">BEST PICKUP RIGHT NOW</div>${card(h).replace(/^<div class="card[^"]*">/,'')}`;rows=rows.filter(i=>i.id!==h.id)}
+    $('fsum').innerHTML=fsumText();document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.preset===cfg.preset))}
   $('list').innerHTML=head+(rows.length?rows.map(card).join(''):(mode==='radar'?`<div class="empty">${me?'Nothing in range with these filters. Widen the range, allow cheap items, lower the value filter, or turn categories back on in Settings.':'Waiting for GPS. Tap the map to set your position by hand.'}</div>`:''));
   const on=link&&pc&&pc.last&&Date.now()-pc.last<6*60e3;
   const nFree=items.filter(i=>!(i.p>0)&&kindOf(i)==='').length,nCheap=items.filter(i=>i.p>0&&kindOf(i)==='').length;
@@ -267,6 +303,12 @@ async function load(fresh){try{
   if(firstRun&&seen.size===0){items.forEach(i=>seen.add(i.id));LS('sr_seen',[...seen])}
 }catch(e){if(fresh)return load(false);$('stat').textContent='Could not load scan data'}}
 
+let yards=null,yardLayer=L.layerGroup();const YC={scrap:'#fbbf24',recycle:'#4ade80',pawn:'#a78bfa',thrift:'#38bdf8'},YN={scrap:'Scrap yard',recycle:'Recycling centre',pawn:'Pawn shop',thrift:'Second-hand / resale shop'};
+async function loadYards(){try{const d=await fetch('yards.json?t='+Math.floor(Date.now()/864e5)).then(r=>r.ok?r.json():null);yards=d?d.yards:[];yardLayer.clearLayers();
+  yards.forEach(y=>L.marker([y.la,y.lo],{icon:L.divIcon({className:'',html:`<div class="yard" style="background:${YC[y.k]}"></div>`,iconSize:[14,14],iconAnchor:[7,7]})}).addTo(yardLayer)
+    .bindPopup(`<b>${esc(y.n)}</b><br>${YN[y.k]}${y.n===YN[y.k]||y.n==='Scrap yard'?' (name not on the map, call or check before driving)':''}${y.a?'<br>'+esc(y.a):''}${y.hr?'<br>Hours: '+esc(y.hr):''}${y.ph?`<br><a href="tel:${esc(y.ph)}">${esc(y.ph)}</a>`:''}<br><a href="https://www.google.com/maps/dir/?api=1&destination=${y.la},${y.lo}" target="_blank" rel="noopener">Navigate</a>${y.w?` · <a href="${esc(y.w)}" target="_blank" rel="noopener">Website</a>`:''}<br><span style="font-size:11px;color:#888">Map data © OpenStreetMap</span>`));
+  showYards();renderRun()}catch(e){yards=[]}}
+function showYards(){if(cfg.yards)yardLayer.addTo(map);else yardLayer.remove()}
 let sys={},events=null,evLayer=L.layerGroup().addTo(map),evOpen=LS('sr_evopen')!==false;
 async function loadEvents(){try{events=await fetch('events.json?t='+Date.now()).then(r=>r.ok?r.json():null)}catch(e){events=null}renderEvents()}
 function fmtD(s){return new Date(s+'T12:00').toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}
@@ -329,9 +371,9 @@ $('unlink').onclick=()=>{localStorage.removeItem('sr_pair');link=null;if(es)es.c
 $('copytopic').onclick=async()=>{try{await navigator.clipboard.writeText(link.alerts);toast('Topic copied: paste it into ntfy → Subscribe')}catch(e){toast(link.alerts,8000)}};
 $('cats').innerHTML=CATS.map(c=>`<button class="chip ${cfg.off.includes(c)?'off':''}" data-cat="${c}">${c}</button>`).join('');
 $('cats').onclick=e=>{const c=e.target.dataset.cat;if(!c)return;cfg.off=cfg.off.includes(c)?cfg.off.filter(x=>x!==c):[...cfg.off,c];e.target.classList.toggle('off');LS('sr_cfg',cfg);render()};
-$('rad').value=cfg.rad;$('min').value=cfg.min;$('price').value=cfg.price||'40';$('kind').value=cfg.kind||'items';$('sort').value=cfg.sort;$('mpg').value=cfg.mpg;$('gas').value=cfg.gas;$('block').value=cfg.block;
-const save=()=>{Object.assign(cfg,{mpg:+$('mpg').value||15,gas:+$('gas').value||0,rad:$('rad').value,min:$('min').value,price:$('price').value,kind:$('kind').value,sort:$('sort').value,block:$('block').value});LS('sr_cfg',cfg);render()};
-['rad','min','price','kind','sort','mpg','gas','block'].forEach(k=>$(k).onchange=save);$('src').onchange=$('end').onchange=render;$('q').oninput=render;
+$('rad').value=cfg.rad;$('min').value=cfg.min;$('age').value=cfg.age||'7';$('yardson').checked=cfg.yards!==false;$('price').value=cfg.price||'40';$('kind').value=cfg.kind||'items';$('sort').value=cfg.sort;$('mpg').value=cfg.mpg;$('gas').value=cfg.gas;$('block').value=cfg.block;
+const save=()=>{Object.assign(cfg,{mpg:+$('mpg').value||15,gas:+$('gas').value||0,rad:$('rad').value,min:$('min').value,age:$('age').value,price:$('price').value,kind:$('kind').value,sort:$('sort').value,block:$('block').value});LS('sr_cfg',cfg);render()};
+['mpg','gas','block'].forEach(k=>$(k).onchange=save);['rad','min','price','kind','sort','age'].forEach(k=>$(k).onchange=()=>{if(['min','price','kind','sort'].includes(k)){cfg.preset='';if(k!=='sort')cfg.focus=''}save()});$('src').onchange=$('end').onchange=render;$('q').oninput=render;
 $('clear').onclick=()=>{run=[];runItems={};LS('sr_run',run);LS('sr_runitems',runItems);render()};
 $('sethome').onclick=()=>{if(me){home={la:me.la,lo:me.lo};LS('sr_home',home);$('sethome').textContent='Home saved';$('end').value='home';render()}};
 $('recenter').onclick=()=>{follow=true;if(me)map.setView([me.la,me.lo],Math.max(map.getZoom(),11))};
@@ -343,6 +385,14 @@ if(navigator.geolocation)navigator.geolocation.watchPosition(p=>setMe(p.coords.l
 if(navigator.wakeLock){const wl=()=>navigator.wakeLock.request('screen').catch(()=>{});wl();document.addEventListener('visibilitychange',()=>document.visibilityState==='visible'&&wl())}
 if(location.hash==='#events'){evOpen=true}
 if(location.hash==='#watches')setTimeout(()=>document.querySelector('[data-mode=watches]').click(),0);
-renderLinks();setupLink();load();loadEvents();setInterval(loadEvents,3600e3);setInterval(()=>load(false),180000);setInterval(()=>{if(link)send({c:'ping'})},300000);
+$('modes').onclick=e=>{const b=e.target.closest('[data-preset]');if(b)applyPreset(b.dataset.preset)};
+$('advbtn').onclick=()=>{const o=$('adv').classList.toggle('show');$('advbtn').textContent=o?'Filters ▴':'Filters ▾';$('advbtn').setAttribute('aria-expanded',o)};
+$('freset').onclick=()=>{$('rad').value='10';$('src').value='';$('q').value='';applyPreset('best')};
+$('yardson').onchange=()=>{cfg.yards=$('yardson').checked;LS('sr_cfg',cfg);showYards()};
+$('recenter2').onclick=()=>$('recenter').click();
+if(!LS('sr_tip'))$('tip').style.display='flex';$('tipx').onclick=()=>{$('tip').style.display='none';LS('sr_tip',1)};
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+{const c0=LS('sr_cfg');if(!c0||c0.preset===undefined)applyPreset('best')}
+loadYards();renderLinks();setupLink();load();loadEvents();setInterval(loadEvents,3600e3);setInterval(()=>load(false),180000);setInterval(()=>{if(link)send({c:'ping'})},300000);
 window.addEventListener('pagehide',()=>{items.forEach(i=>seen.add(i.id));LS('sr_seen',[...seen])});
 </script></body></html>
