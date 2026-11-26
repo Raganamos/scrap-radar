@@ -55,13 +55,16 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 .hero{border:1px solid var(--go);border-left:4px solid var(--go);background:#10221a}.hero .lbl{font:700 11px ui-monospace,monospace;letter-spacing:.12em;color:var(--go);margin-bottom:4px}
 .card.old{opacity:.72}.tag.fit{color:#fb923c}.tag.also{color:var(--srch)}
 .mapbtn{position:absolute;right:10px;bottom:10px;z-index:800;width:44px;height:44px;border-radius:50%;padding:0;font-size:20px;background:var(--pan);border:1px solid var(--line)}
+.hl{display:grid;grid-template-columns:1fr auto;gap:4px 10px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.hl .hin{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}.hl input{width:92px}.hl select{flex:1 1 110px}
+.tot{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}.tot div{background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px 4px}.tot b{display:block;font:700 17px ui-monospace,monospace;color:var(--go)}.tot span{font-size:11.5px;color:var(--mut)}
 .yard{width:14px;height:14px;border-radius:3px;border:2px solid #0b100d}
 #tip{font-size:13px;color:var(--mut);padding:8px 12px;background:#101c14;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}#tip b{color:var(--tx)}
 .leaflet-container{background:#0e1511}.leaflet-tile{filter:brightness(.72) contrast(1.1) saturate(.6)}
 </style></head><body>
 <header><h1>SCRAP RADAR</h1><div id="stat">starting…</div></header>
 <div id="map"><button class="mapbtn" id="recenter2" aria-label="Center on me" title="Center on me">◎</button></div>
-<nav><button data-mode="radar" class="on">Radar</button><button data-mode="search">Search</button><button data-mode="watches">Watches</button><button data-mode="calls">Calls</button><button id="setbtn" aria-label="Settings" style="flex:0 0 52px">⚙︎</button></nav>
+<nav><button data-mode="radar" class="on">Radar</button><button data-mode="search">Search</button><button data-mode="watches">Watches</button><button data-mode="calls">Calls</button><button data-mode="haul">Haul</button><button id="setbtn" aria-label="Settings" style="flex:0 0 52px">⚙︎</button></nav>
 
 <div id="set">
   <div class="row"><b style="font-size:13px">PC link:</b><span id="linkstate" style="font-size:13px;color:var(--mut)"></span><button id="ping">Check PC</button><button id="unlink">Unlink</button></div>
@@ -77,7 +80,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 
 <div class="panel show" id="p-radar">
 <div id="tip" style="display:none"><span style="flex:1"><b>Quick start:</b> pick a mode below, then tap <b>Plan my run</b>. On any card: <b>Add to run</b>, <b>Message</b> the seller, or <b>Navigate</b>. Tap <b>Filters</b> to fine-tune.</span><button id="tipx" aria-label="Dismiss">Got it</button></div>
-<div class="bar modes" id="modes"><button data-preset="best">⭐ Best near me</button><button data-preset="free">Free only</button><button data-preset="scrap">Scrap metal</button><button data-preset="flip">Big flips</button><button data-preset="yard">Yard sales</button></div>
+<div class="bar modes" id="modes"><button data-preset="best">⭐ Best near me</button><button data-preset="free">Free only</button><button data-preset="scrap">Scrap metal</button><button data-preset="flip">Big flips</button><button data-preset="yard">Yard sales</button><button id="ahead" title="Only show finds along the road ahead while you drive">🚗 Road ahead</button></div>
 <div class="bar fbar"><button id="advbtn" aria-expanded="false">Filters ▾</button><span id="fsum"></span><button id="autoplan" class="go">Plan my run</button></div>
 <div class="bar" id="adv">
   <select id="age" aria-label="Posted within"><option value="1">Posted today</option><option value="3">Last 3 days</option><option value="7" selected>Last 7 days</option><option value="any">Any age</option></select>
@@ -101,6 +104,8 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 
 <div class="panel" id="p-watches"><div class="bar" style="font-size:13px;color:var(--mut)">Your PC re-runs each watch every 30 minutes and alerts you about new matches. Add one from the Search tab.</div></div>
 <div class="panel" id="p-calls"><div class="bar" style="font-size:13px;color:var(--mut)">"Check availability" has a Net Hero agent call the seller when the listing shows a phone number; otherwise you get a ready-to-send message.</div></div>
+
+<div class="panel" id="p-haul"><div class="bar" style="font-size:13px;color:var(--mut)">Everything you tapped "Got it" on. Enter what you paid and what it sold for: your PC uses real sale prices to sharpen future value estimates.</div></div>
 
 <div id="run">
   <h2>My pickup run</h2>
@@ -237,8 +242,21 @@ function dedupe(rows){const keep=[],byKey={};rows.slice().sort((a,b)=>(b.px==='e
   const twin=(byKey[k]||[]).find(j=>dist(i.la,i.lo,j.la,j.lo)<3);if(twin){(twin.also=twin.also||[]).push(i.src);return}(byKey[k]=byKey[k]||[]).push(i);keep.push(i)});return keep}
 function heroPick(rows){const c=rows.filter(i=>!run.includes(i.id)&&i.dm!=null&&i.v&&i.v.best>=20&&i.net>10&&kindOf(i)==='');if(!c.length)return null;
   const sc=i=>i.net+(i.px==='exact'?10:0)-Math.min(20,(Date.now()-when(i))/864e5*3);return c.reduce((a,b)=>sc(b)>sc(a)?b:a)}
+const bearingLbl=d=>['N','NE','E','SE','S','SW','W','NW'][Math.round(d/45)%8]+'-bound';
 function fsumText(){const o=t=>$(t).selectedOptions[0].textContent;const pr={best:'⭐ Best near me',free:'Free only',scrap:'Scrap metal',flip:'Big flips',yard:'Yard sales'}[cfg.preset];
-  return `${pr?'<b style="color:var(--tx)">'+pr+'</b> · ':''}${cfg.preset==='free'?'':o('price')+' · '}${o('rad')} · ${o('age').toLowerCase()} · ${o('sort').toLowerCase()}${$('src').value?' · '+o('src'):''}${$('q').value?' · "'+esc($('q').value)+'"':''}`}
+  return `${pr?'<b style="color:var(--tx)">'+pr+'</b> · ':''}${cfg.preset==='free'?'':o('price')+' · '}${o('rad')} · ${o('age').toLowerCase()} · ${o('sort').toLowerCase()}${cfg.ahead?(hdg&&Date.now()-hdg.at<6e5?' · 🚗 road ahead ('+bearingLbl(hdg.deg)+')':' · 🚗 road ahead: starts once you are moving'):''}${$('src').value?' · '+o('src'):''}${$('q').value?' · "'+esc($('q').value)+'"':''}`}
+function haulHTML(){if(!haul.length)return '<div class="empty">Nothing in your haul yet. Tap "Got it" on a card when you pick something up.</div>';
+  const est=haul.reduce((a,h)=>a+(h.v||0),0),paid=haul.reduce((a,h)=>a+(+h.paid||0),0),sold=haul.filter(h=>h.sold!=null&&h.sold!=='');
+  const got=sold.reduce((a,h)=>a+(+h.sold||0),0),cost=sold.reduce((a,h)=>a+(+h.paid||0),0);
+  const HOW=['','scrap yard','pawn shop','sold online','yard sale','kept it','gave away / tossed'];
+  return `<div class="tot"><div><b>${haul.length}</b><span>picked up</span></div><div><b>${money(est)}</b><span>estimated</span></div><div><b>${money(got)}</b><span>sold so far (${sold.length})</span></div><div><b class="${got-cost<0?'neg':''}">${money(got-cost)}</b><span>profit on sold</span></div></div>
+  <div class="sum">Paid for everything: ${money(paid)} · still to sell: ${haul.length-sold.length} items, about ${money(haul.filter(h=>h.sold==null||h.sold==='').reduce((a,h)=>a+(h.v||0),0))}</div>`+
+  haul.slice().reverse().map(h=>`<div class="hl"><div><div class="t">${h.u?`<a href="${esc(h.u)}" target="_blank" rel="noopener" style="color:inherit">${esc(h.t)}</a>`:esc(h.t)}</div><div class="m">${new Date(h.at).toLocaleDateString()} · ${esc(h.c||'item')} · estimated ${money(h.v||0)}</div></div>
+   <div class="d">${h.sold!=null&&h.sold!==''?money(h.sold-(+h.paid||0)):''}<small>${h.sold!=null&&h.sold!==''?'profit':'not sold'}</small></div>
+   <div class="hin"><input type="number" inputmode="decimal" min="0" placeholder="Paid $" aria-label="Paid" value="${h.paid||''}" data-hpaid="${esc(h.id)}"><input type="number" inputmode="decimal" min="0" placeholder="Sold for $" aria-label="Sold for" value="${h.sold??''}" data-hsold="${esc(h.id)}">
+   <select data-hhow="${esc(h.id)}" aria-label="Where it went">${HOW.map(o=>`<option value="${o}"${h.how===o?' selected':''}>${o||'Where did it go?'}</option>`).join('')}</select><button data-hdel="${esc(h.id)}" aria-label="Remove">✕</button></div></div>`).join('')}
+function haulSet(id,f,v){const h=haul.find(x=>x.id===id);if(!h)return;h[f]=v;LS('sr_haul',haul);
+  if(f==='sold'||f==='paid'||f==='how')send({c:'sold',id:h.id,t:h.t,c:h.c,src:h.src,est:h.v,paid:+h.paid||0,sold:h.sold===''||h.sold==null?null:+h.sold,how:h.how});render()}
 function roi(i){const b=(i.v&&i.v.best)||0;return (b-(i.p||0)-(i.fuel||0))/Math.max(1,(i.p||0)+(i.fuel||0))}
 function enrich(i){const dm=me?dist(me.la,me.lo,i.la,i.lo):null,best=(i.v&&i.v.best)||0,fuel=dm==null?0:trip(dm*2);return{...i,dm,fuel,net:best-(i.p||0)-fuel}}
 function etaFor(i){if(i.dm==null)return'today';const t=new Date(Date.now()+(i.dm*1.3/35*60+20)*60000);t.setMinutes(Math.ceil(t.getMinutes()/15)*15,0,0);
@@ -264,10 +282,11 @@ function render(){
   let rows=[],pinColor=null;
   if(mode==='radar'){const r=+$('rad').value,min=+$('min').value,src=$('src').value,q=$('q').value.trim().toLowerCase(),pv=$('price').value,kv=$('kind').value;
     const av=$('age').value,fo=FOCUS[cfg.focus];
-    rows=dedupe(items.map(i=>({...i,also:null})).filter(i=>run.includes(i.id)||(keep(i)&&priceOk(i,pv)&&kindOk(i,kv)&&ageOk(i,av)&&(kv==='yardonly'||i.s>=min)&&(!fo||fo(i))&&(!src||i.src===src)&&(!q||(i.t+' '+i.h).toLowerCase().includes(q))))).map(enrich);
+    rows=dedupe(items.map(i=>({...i,also:null})).filter(i=>run.includes(i.id)||(keep(i)&&priceOk(i,pv)&&kindOk(i,kv)&&ageOk(i,av)&&(kv==='yardonly'||i.s>=min)&&(!fo||fo(i))&&aheadOk(i,r)&&(!src||i.src===src)&&(!q||(i.t+' '+i.h).toLowerCase().includes(q))))).map(enrich);
     if(me)rows=rows.filter(i=>i.dm<=r||run.includes(i.id))}
   else if(mode==='search'){rows=(search&&search.items||[]).filter(keep).map(enrich);pinColor='#a78bfa'}
   else if(mode==='watches'){rows=hits.filter(keep).map(enrich);pinColor='#a78bfa'}
+  else if(mode==='haul'){rows=[]}
   else if(mode==='calls'){const tc=calls['test-call'];if(tc&&!lookup('test-call'))runItems['test-call']={id:'test-call',t:'Test call to your phone',h:'',u:'#',src:'test',la:28.04,lo:-81.95,c:'test',s:1};rows=Object.entries(calls).sort((a,b)=>(b[1].t||0)-(a[1].t||0)).map(([k])=>lookup(k)).filter(Boolean).map(enrich)}
   const sort=$('sort').value;
   if(mode!=='calls')rows.sort(sort==='net'?(a,b)=>b.net-a.net:sort==='val'?(a,b)=>((b.v&&b.v.best)||0)-((a.v&&a.v.best)||0):sort==='new'?(a,b)=>when(b)-when(a):sort==='cheap'?(a,b)=>((a.p||0)-(b.p||0))||(me?a.dm-b.dm:0):sort==='roi'?(a,b)=>roi(b)-roi(a):(a,b)=>me?a.dm-b.dm:(b.s||0)-(a.s||0));
@@ -280,19 +299,26 @@ function render(){
   let head='';
   if(mode==='search'){head=search?`<div class="sum">${search.state==='searching'?'Your PC is searching for "'+esc(search.q)+'"…':search.state==='estimating'?'Results for "'+esc(search.q)+'" · estimating values…':'Results for "'+esc(search.q)+'" · '+rows.length+' shown'}${search.errs&&Object.keys(search.errs).length?' · couldn\'t search '+Object.keys(search.errs).map(k=>SRC[k]).join(', '):''}</div>`:'<div class="empty">Type what you are after and tap "Scan with my PC", or open the search on any site with the buttons above.</div>'}
   if(mode==='watches')head=watchList.length?watchList.map(w=>`<div class="watch"><div><b>${esc(w.q)}</b><div class="m">${w.free?'free only':w.max==null?'any price':'up to $'+w.max} · ${w.r} mi · ${w.hits||0} new matches so far</div></div><button data-unwatch="${esc(w.id)}">Stop</button></div>`).join('')+(rows.length?'<div class="sum">Recent matches</div>':''):`<div class="empty">${link?'No watches yet. Search for something, then tap "Watch this search".':'Link your PC first (Settings ⚙︎).'}</div>`;
+  if(mode==='haul')head=haulHTML();
   if(mode==='calls'&&!rows.length)head='<div class="empty">No availability checks yet. Tap "Check availability" on a Craigslist listing.</div>';
   if(mode==='radar'){const h=me&&heroPick(rows);if(h){head+=`<div class="card hero"><div class="lbl">BEST PICKUP RIGHT NOW</div>${card(h).replace(/^<div class="card[^"]*">/,'')}`;rows=rows.filter(i=>i.id!==h.id)}
-    $('fsum').innerHTML=fsumText();document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.preset===cfg.preset))}
+    $('fsum').innerHTML=fsumText();document.querySelectorAll('#modes [data-preset]').forEach(b=>b.classList.toggle('on',b.dataset.preset===cfg.preset));$('ahead').classList.toggle('on',!!cfg.ahead)}
   $('list').innerHTML=head+(rows.length?rows.map(card).join(''):(mode==='radar'?`<div class="empty">${me?'Nothing in range with these filters. Widen the range, allow cheap items, lower the value filter, or turn categories back on in Settings.':'Waiting for GPS. Tap the map to set your position by hand.'}</div>`:''));
   const on=link&&pc&&pc.last&&Date.now()-pc.last<6*60e3;
   const nFree=items.filter(i=>!(i.p>0)&&kindOf(i)==='').length,nCheap=items.filter(i=>i.p>0&&kindOf(i)==='').length;
-  $('stat').innerHTML=`${mode==='radar'?rows.length+' shown · '+nFree+' free, '+nCheap+' cheap tracked':''}${haul.length?` · haul: ${haul.length}, ~${money(haul.reduce((a,h)=>a+h.v,0))}`:''}<br>${link?`<span class="dot ${on?'on':''}"></span>PC ${on?'online':'linked'} · `:''}${me?(meManual?'position set by hand':'GPS live'):'no position yet'} · scan ${scanned?age(scanned):'?'}${statusOk?'':' · <span style="color:#fbbf24">last scan failed</span>'}`;
+  $('stat').innerHTML=`${mode==='radar'?rows.length+' shown · '+nFree+' free, '+nCheap+' cheap tracked':''}${haul.length?`${mode==='radar'?' · ':''}haul: ${haul.length}, ~${money(haul.reduce((a,h)=>a+h.v,0))}`:''}<br>${link?`<span class="dot ${on?'on':''}"></span>PC ${on?'online':'linked'} · `:''}${me?(meManual?'position set by hand':'GPS live'):'no position yet'} · scan ${scanned?age(scanned):'?'}${statusOk?'':' · <span style="color:#fbbf24">last scan failed</span>'}`;
   if(mode==='radar'&&me&&!meManual)rows.filter(i=>i.s>=4&&i.dm<=Math.min(+$('rad').value,3)&&!announced.has(i.id)).slice(0,2).forEach(i=>{announced.add(i.id);
     try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
     if(voice&&window.speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance(`${i.t}, ${i.dm.toFixed(1)} miles ${bearing(me.la,me.lo,i.la,i.lo)}`))});
   renderRun();renderEvents();
 }
-function setMe(la,lo,manual){const first=!me;me={la,lo};meManual=manual;
+let hdg=null,lastFix=null;
+function trackHeading(la,lo,manual){if(manual){hdg=null;lastFix=null;return}const now=Date.now();
+  if(lastFix){const mv=dist(lastFix.la,lastFix.lo,la,lo);if(mv>=0.06){const y=Math.sin(rad(lo-lastFix.lo))*Math.cos(rad(la)),x=Math.cos(rad(lastFix.la))*Math.sin(rad(la))-Math.sin(rad(lastFix.la))*Math.cos(rad(la))*Math.cos(rad(lo-lastFix.lo));
+    hdg={deg:(Math.atan2(y,x)*180/Math.PI+360)%360,mph:mv/Math.max(1,(now-lastFix.t)/36e5),at:now};lastFix={la,lo,t:now}}}else lastFix={la,lo,t:now}}
+function aheadOk(i,r){if(!cfg.ahead||!hdg||Date.now()-hdg.at>6e5||!me)return true;const dx=(i.lo-me.lo)*69.17*Math.cos(rad(me.la)),dy=(i.la-me.la)*69,hx=Math.sin(rad(hdg.deg)),hy=Math.cos(rad(hdg.deg));
+  const along=dx*hx+dy*hy,side=Math.abs(dx*hy-dy*hx);return along>-0.3&&along<=Math.max(r,3)&&side<=Math.max(1.5,along*0.2)}
+function setMe(la,lo,manual){trackHeading(la,lo,manual);const first=!me;me={la,lo};meManual=manual;
   if(!meMark)meMark=L.marker([la,lo],{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[16,16],iconAnchor:[8,8]}),zIndexOffset:1000}).addTo(map);else meMark.setLatLng([la,lo]);
   if(first)map.setView([la,lo],11);else if(follow&&!manual)map.panTo([la,lo]);render();renderLinks()}
 async function load(fresh){try{
@@ -339,10 +365,11 @@ function renderLinks(){const a=searchArgs(),e=encodeURIComponent(a.q||'free'),pm
 
 /* ---------- events ---------- */
 document.addEventListener('click',async e=>{const t=e.target.closest('button,[data-mode]');if(!t)return;const d=t.dataset;
-  if(d.mode){mode=d.mode;document.querySelectorAll('nav [data-mode]').forEach(b=>b.classList.toggle('on',b===t));['radar','search','watches','calls'].forEach(m=>$('p-'+m).classList.toggle('show',m===mode));if(mode==='watches'||mode==='calls')send({c:'ping'});render();return}
+  if(d.mode){mode=d.mode;document.querySelectorAll('nav [data-mode]').forEach(b=>b.classList.toggle('on',b===t));['radar','search','watches','calls','haul'].forEach(m=>$('p-'+m).classList.toggle('show',m===mode));if(mode==='watches'||mode==='calls')send({c:'ping'});render();return}
   if(d.ad){const it=lookup(d.ad);if(it){adT.add(normT(it.t));LS('sr_adtitles',[...adT])}hidden.add(d.ad);run=run.filter(x=>x!==d.ad);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Hidden, along with any repeats of that ad');render()}
   if(d.hide){hidden.add(d.hide);run=run.filter(x=>x!==d.hide);LS('sr_hidden',[...hidden]);LS('sr_run',run);render()}
-  if(d.got){const it=lookup(d.got);haul.push({id:d.got,t:it?it.t:'',v:(it&&it.v&&it.v.best)||0,at:Date.now()});LS('sr_haul',haul);hidden.add(d.got);run=run.filter(x=>x!==d.got);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Added to your haul');render()}
+  if(d.hdel){haul=haul.filter(h=>h.id!==d.hdel);LS('sr_haul',haul);send({c:'sold',id:d.hdel,sold:null});render();return}
+  if(d.got){const it=lookup(d.got);haul.push({id:d.got,t:it?it.t:'',v:(it&&it.v&&it.v.best)||0,at:Date.now(),c:it&&it.c,src:it&&it.src,u:it&&it.u,paid:it&&it.p?Math.round(it.p):0,sold:null,how:''});LS('sr_haul',haul);hidden.add(d.got);run=run.filter(x=>x!==d.got);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Added to your haul');render()}
   if(d.run){const it=lookup(d.run);if(run.includes(d.run))run=run.filter(x=>x!==d.run);else{run=[...run,d.run];if(it)runItems[d.run]=it}
     Object.keys(runItems).forEach(k=>{if(!run.includes(k))delete runItems[k]});LS('sr_run',run);LS('sr_runitems',runItems);render()}
   if(d.msg){const i=enrich(lookup(d.msg));const m=msgFor(i);try{await navigator.clipboard.writeText(m);toast('Message copied. Paste it to the seller.')}catch(err){toast(m,8000)}window.open(i.u,'_blank','noopener')}
@@ -385,6 +412,8 @@ if(navigator.geolocation)navigator.geolocation.watchPosition(p=>setMe(p.coords.l
 if(navigator.wakeLock){const wl=()=>navigator.wakeLock.request('screen').catch(()=>{});wl();document.addEventListener('visibilitychange',()=>document.visibilityState==='visible'&&wl())}
 if(location.hash==='#events'){evOpen=true}
 if(location.hash==='#watches')setTimeout(()=>document.querySelector('[data-mode=watches]').click(),0);
+$('ahead').onclick=()=>{cfg.ahead=!cfg.ahead;LS('sr_cfg',cfg);if(cfg.ahead&&!hdg)toast('Road ahead turns on once you are driving: it follows the direction you are heading.');render()};
+$('list').addEventListener('change',e=>{const d=e.target.dataset;if(d.hpaid)haulSet(d.hpaid,'paid',e.target.value);else if(d.hsold)haulSet(d.hsold,'sold',e.target.value);else if(d.hhow)haulSet(d.hhow,'how',e.target.value)});
 $('modes').onclick=e=>{const b=e.target.closest('[data-preset]');if(b)applyPreset(b.dataset.preset)};
 $('advbtn').onclick=()=>{const o=$('adv').classList.toggle('show');$('advbtn').textContent=o?'Filters ▴':'Filters ▾';$('advbtn').setAttribute('aria-expanded',o)};
 $('freset').onclick=()=>{$('rad').value='10';$('src').value='';$('q').value='';applyPreset('best')};
