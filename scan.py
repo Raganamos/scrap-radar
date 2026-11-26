@@ -258,7 +258,24 @@ def rule_estimate(title):
     return {"rl": rl, "rh": rh, "w": w, "m": m, "cf": "low", "why": "typical price and weight for this kind of item", "by": "rule"}
 
 AI_NOTE = {}
+def sold_factors():
+    """Learn from what Austin actually sold things for (../sold.json, kept on the PC only): per-category
+    median of sold price / our estimate, once there are 3+ sales in that category (5+ for the overall factor)."""
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sold.json")
+    try: rows = [r for r in json.load(open(p)) if r.get("est", 0) > 0 and r.get("sold") is not None]
+    except Exception: return {}
+    med = lambda xs: sorted(xs)[len(xs) // 2]
+    clamp = lambda f: round(max(0.4, min(2.5, f)), 2)
+    out, by = {}, {}
+    for r in rows: by.setdefault(r.get("c") or "other", []).append(r["sold"] / r["est"])
+    for c, xs in by.items():
+        if len(xs) >= 3: out[c] = clamp(med(xs))
+    allx = [x for xs in by.values() for x in xs]
+    if len(allx) >= 5: out["*"] = clamp(med(allx))
+    return out
+
 def add_values(items, seed):
+    CAL = sold_factors()
     cache = json.load(open("est.json")) if os.path.exists("est.json") else {}
     budget, ai_ok, done = CFG.get("max_estimates_per_run", 30), not seed, 0
     if ai_ok and gpu_busy(): ai_ok = False; AI_NOTE["note"] = "paused: GPU busy (game or other heavy work running)"
@@ -272,9 +289,11 @@ def add_values(items, seed):
         if not e: continue
         if e.get("by") == "ai": cache[it["id"]] = e
         sc = round(e["w"] * PRICES.get(e["m"], 0))
-        v = {"rl": e["rl"], "rh": e["rh"], "sc": sc, "cf": e["cf"], "why": e["why"], "by": e["by"]}
+        f = CAL.get(it.get("c") or "other", CAL.get("*", 1))
+        v = {"rl": round(e["rl"] * f), "rh": round(e["rh"] * f), "sc": sc, "cf": e["cf"], "why": e["why"], "by": e["by"]}
+        if f != 1: v["cal"] = f   # adjusted by your own sale prices
         if e["w"] and e["m"] != "none": v["w"], v["m"] = e["w"], e["m"]
-        v["best"] = max(sc, e["rl"])   # conservative: scrap value or the as-is resale figure, whichever is higher
+        v["best"] = max(sc, v["rl"])   # conservative: scrap value or the as-is resale figure, whichever is higher
         it["v"] = v
     live = {i["id"] for i in items}
     json.dump({k: v for k, v in cache.items() if k in live}, open("est.json", "w"))
