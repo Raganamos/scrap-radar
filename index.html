@@ -86,6 +86,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
   <div class="row" id="alertrow" style="display:none"><span style="font-size:13px;color:var(--mut)">Phone alerts: install the free <b>ntfy</b> app, then</span><a id="alertlink" class="chip" style="background:var(--go);color:#04130a;text-decoration:none;font-weight:600">Subscribe in ntfy</a><button id="copytopic" class="chip">Copy topic</button></div>
   <div class="row" id="retellrow"><span style="font-size:13px;color:var(--mut);flex:1 1 100%">Net Hero calling: paste the Retell API key (Retell dashboard → Settings → API Keys). It goes to your PC encrypted and is stored only there.</span><input id="rkey" type="password" autocomplete="off" placeholder="key_…" style="flex:1 1 160px"><button id="rsave">Connect</button><button id="rtest">Test call to me</button></div>
   <div class="row"><label>Truck mpg <input id="mpg" type="number" inputmode="decimal" step="0.5" min="1" style="width:80px"></label><label>Gas $/gal <input id="gas" type="number" inputmode="decimal" step="0.05" min="0" style="width:80px"></label></div>
+  <div class="row"><label>Wear $/mile <input id="wear" type="number" inputmode="decimal" step="0.01" min="0" style="width:80px"></label><label>Your time $/hour <input id="hr" type="number" inputmode="decimal" step="1" min="0" style="width:80px"></label></div>
   <div style="font-size:13px;color:var(--mut);margin-top:6px">Show these kinds of listings (tap to switch off):</div>
   <div class="chips" id="cats" style="margin:6px 0"></div>
   <label style="display:block">Never show listings with these words (comma separated)<textarea id="block" rows="2" style="width:100%;margin-top:4px" placeholder="mattress, couch, crib"></textarea></label>
@@ -174,7 +175,8 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 <dt>Radar</dt><dd>The live map and list.</dd><dt>Search</dt><dd>Your PC searches every site for anything you type, right now.</dd>
 <dt>Watches</dt><dd>Saved searches; you get an alert when something new matches.</dd><dt>Calls</dt><dd>Results of Net Hero availability calls.</dd>
 <dt>Haul</dt><dd>What you picked up. Enter what you paid and sold it for; your PC uses real sale prices to sharpen future estimates.</dd>
-<dt>⚙︎</dt><dd>PC link, alerts, gas and mpg, categories and blocked words.</dd>
+<dt>🚚 Trip (Haul tab)</dt><dd>Start a trip to log miles and time by GPS. ✓ Got it charges the drive to that pickup; ✗ Not there (or Gone / skip at the stop) rolls those miles into the next pickup. End trip saves the total cost and net.</dd>
+<dt>⚙︎</dt><dd>PC link, alerts, gas, mpg, wear per mile, value of your time, categories and blocked words.</dd>
 </dl>
 <h3>Map</h3><dl><dt>Dots</dt><dd>Red = best, amber = good, green = worth a look. Squares: yellow scrap yards, green recycling, purple pawn, blue resale shops.</dd>
 <dt>◎ / Smaller map</dt><dd>Re-center on you · shrink the map to see more listings.</dd></dl>
@@ -188,7 +190,7 @@ let items=[],me=null,meManual=false,voice=false,scanned=null,statusOk=true,follo
 let hidden=new Set(LS('sr_hidden')||[]),run=LS('sr_run')||[],seen=new Set(LS('sr_seen')||[]),announced=new Set(),home=LS('sr_home');
 let runItems=LS('sr_runitems')||{},search=LS('sr_search')||null,watchList=LS('sr_watches')||[],hits=LS('sr_hits')||[],calls=LS('sr_calls')||{},pc=LS('sr_pc')||null;
 const firstRun=!LS('sr_seen');
-let cfg=Object.assign({mpg:15,gas:3.1,rad:'10',min:'4',sort:'near',price:'40',kind:'items',age:'7',focus:'',preset:'best',yards:true,off:[],block:''},LS('sr_cfg')||{}),haul=LS('sr_haul')||[];
+let cfg=Object.assign({mpg:15,gas:3.1,wear:0.15,hr:0,rad:'10',min:'4',sort:'near',price:'40',kind:'items',age:'7',focus:'',preset:'best',yards:true,off:[],block:''},LS('sr_cfg')||{}),haul=LS('sr_haul')||[];
 const trip=mi=>mi*1.3/cfg.mpg*cfg.gas, money=n=>'$'+Math.round(n).toLocaleString();
 function dist(a,b,c,d){const x=rad(d-b)*Math.cos(rad((a+c)/2)),y=rad(c-a);return Math.sqrt(x*x+y*y)*R}
 function bearing(a,b,c,d){const y=Math.sin(rad(d-b))*Math.cos(rad(c)),x=Math.cos(rad(a))*Math.sin(rad(c))-Math.sin(rad(a))*Math.cos(rad(c))*Math.cos(rad(d-b));return ['N','NE','E','SE','S','SW','W','NW'][Math.round(((Math.atan2(y,x)*180/Math.PI)+360)%360/45)%8]}
@@ -313,14 +315,43 @@ function heroPick(rows){const c=rows.filter(i=>!run.includes(i.id)&&i.dm!=null&&
 const bearingLbl=d=>['N','NE','E','SE','S','SW','W','NW'][Math.round(d/45)%8]+'-bound';
 function fsumText(){const o=t=>$(t).selectedOptions[0].textContent;const pr={fresh:'🔥 Just posted',best:'⭐ Best near me',free:'Free only',scrap:'Scrap metal',flip:'Big flips',yard:'Yard sales'}[cfg.preset];
   return `${pr?'<b style="color:var(--tx)">'+pr+'</b> · ':''}${cfg.preset==='free'?'':o('price')+' · '}${o('rad')} · ${o('age').toLowerCase()} · ${o('sort').toLowerCase()}${rtOn()?' · 🧭 along route ('+$('tripw').value+' mi)':''}${cfg.ahead?(hdg&&Date.now()-hdg.at<6e5?' · 🚗 road ahead ('+bearingLbl(hdg.deg)+')':' · 🚗 road ahead: starts once you are moving'):''}${$('src').value?' · '+o('src'):''}${$('q').value?' · "'+esc($('q').value)+'"':''}`}
-function haulHTML(){if(!haul.length)return '<div class="empty">Nothing in your haul yet. Tap "Got it" on a card when you pick something up.</div>';
+
+// ---- trip log: GPS miles + time; misses roll into the next pickup ----
+let tr=LS('sr_trip')||{on:false},trips=LS('sr_trips')||[];
+const perMi=()=>cfg.gas/cfg.mpg+(cfg.wear||0),tCost=(mi,min)=>mi*perMi()+(min/60)*(cfg.hr||0);
+const fmtMin=m=>m>=60?Math.floor(m/60)+'h '+Math.round(m%60)+'m':Math.round(m)+'m';
+setInterval(()=>{if(tr.on&&mode==='haul')render()},60000);
+function trSave(){LS('sr_trip',tr);LS('sr_trips',trips)}
+function trStart(){tr={on:true,start:Date.now(),mi:0,last:me&&!meManual?{la:me.la,lo:me.lo}:null,legMi:0,legT:Date.now(),carryMi:0,carryMin:0,stops:[]};trSave();toast('Trip started: logging miles and time');render()}
+function trMove(la,lo){if(!tr.on)return;if(tr.last){const d=dist(tr.last.la,tr.last.lo,la,lo);if(d<0.03)return;if(d<3){tr.mi+=d;tr.legMi+=d}}tr.last={la,lo};trSave()}
+function trLeg(){const min=(Date.now()-tr.legT)/6e4;return{mi:tr.legMi+tr.carryMi,min:min+tr.carryMin}}
+function trStop(kind,it){if(!tr.on)return null;const legMin=(Date.now()-tr.legT)/6e4,s={at:Date.now(),kind,t:it?it.t:'',id:it?it.id:'',v:(it&&it.v&&it.v.best)||0,legMi:tr.legMi,legMin};
+  let alloc=null;if(kind==='got'){alloc={mi:tr.legMi+tr.carryMi,min:legMin+tr.carryMin,missed:tr.stops.filter(x=>x.kind==='miss'&&!x.alloc).length};tr.stops.forEach(x=>{if(x.kind==='miss')x.alloc=1});tr.carryMi=0;tr.carryMin=0;s.alloc=alloc}
+  else{tr.carryMi+=tr.legMi;tr.carryMin+=legMin}
+  tr.stops.push(s);tr.legMi=0;tr.legT=Date.now();trSave();return alloc}
+function trEnd(){if(!tr.on)return;const min=(Date.now()-tr.start)/6e4,got=tr.stops.filter(x=>x.kind==='got'),miss=tr.stops.filter(x=>x.kind==='miss');
+  trips.push({id:'t'+tr.start,start:tr.start,end:Date.now(),mi:+tr.mi.toFixed(1),min:Math.round(min),got:got.length,miss:miss.length,v:got.reduce((a,x)=>a+x.v,0),stops:tr.stops,tail:{mi:+(tr.legMi+tr.carryMi).toFixed(1),min:Math.round((Date.now()-tr.legT)/6e4+tr.carryMin)}});
+  tr={on:false};trSave();toast('Trip saved');render()}
+function tripHTML(){const bar=tr.on?(()=>{const min=(Date.now()-tr.start)/6e4,lg=trLeg(),c=tCost(tr.mi,min);return `<div class="card" style="border-color:#4ade80"><div class="lbl" style="color:#4ade80">🚚 TRIP RUNNING</div>
+   <div class="tot"><div><b>${tr.mi.toFixed(1)}</b><span>miles</span></div><div><b>${fmtMin(min)}</b><span>time</span></div><div><b>${money(c)}</b><span>cost so far</span></div><div><b>${tr.stops.filter(x=>x.kind==='got').length}/${tr.stops.length}</b><span>picked up / stops</span></div></div>
+   <div class="sum">Riding on the next pickup: ${lg.mi.toFixed(1)} mi, ${fmtMin(lg.min)} (${money(tCost(lg.mi,lg.min))})${tr.carryMi||tr.carryMin?` · includes ${tr.stops.filter(x=>x.kind==='miss'&&!x.alloc).length} missed stop(s)`:''}</div>
+   <div class="acts"><button data-trmiss="1">✗ Not there / no-go</button><button data-trend="1">End trip</button></div><div class="sum">Keep this page open while driving so GPS counts the miles. Tap ✓ Got it on a card when you load something; tap ✗ when a stop is a bust.</div></div>`})()
+   :`<div class="card"><div class="acts"><button data-trstart="1">🚚 Start trip (log miles + time)</button></div><div class="sum">Costs you $${perMi().toFixed(2)} a mile (gas + wear)${cfg.hr?' + '+money(cfg.hr)+'/hr for your time':''}. Change in ⚙︎.</div></div>`;
+  if(!trips.length)return bar;const T=trips.slice().reverse().slice(0,10);
+  const tm=trips.reduce((a,t)=>a+t.mi,0),tmin=trips.reduce((a,t)=>a+t.min,0),tc=trips.reduce((a,t)=>a+tCost(t.mi,t.min),0),tv=trips.reduce((a,t)=>a+t.v,0);
+  return bar+`<div class="sum"><b style="color:var(--tx)">Trips</b> · ${trips.length} trips · ${tm.toFixed(0)} mi · ${fmtMin(tmin)} · cost ${money(tc)} · est. hauled ${money(tv)} · net ${money(tv-tc)}</div>`+
+   T.map(t=>{const c=tCost(t.mi,t.min);return `<div class="hl"><div><div class="t">${new Date(t.start).toLocaleDateString()} ${new Date(t.start).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</div><div class="m">${t.mi} mi · ${fmtMin(t.min)} · ${t.got} picked up, ${t.miss} missed · est. ${money(t.v)}${t.got?' · '+money(c/t.got)+' per pickup':''}</div></div>
+   <div class="d ${t.v-c<0?'neg':''}">${money(t.v-c)}<small>net (cost ${money(c)})</small></div>
+   <div class="hin"><input type="number" inputmode="decimal" min="0" step="0.1" placeholder="Miles" aria-label="Correct miles" value="${t.mi}" data-tmi="${t.id}"><button data-tdel="${t.id}" aria-label="Remove trip">✕</button></div></div>`}).join('')}
+function haulHTML(){return tripHTML()+haulBody()}
+function haulBody(){if(!haul.length)return '<div class="empty">Nothing in your haul yet. Tap "Got it" on a card when you pick something up.</div>';
   const est=haul.reduce((a,h)=>a+(h.v||0),0),paid=haul.reduce((a,h)=>a+(+h.paid||0),0),sold=haul.filter(h=>h.sold!=null&&h.sold!=='');
-  const got=sold.reduce((a,h)=>a+(+h.sold||0),0),cost=sold.reduce((a,h)=>a+(+h.paid||0),0);
+  const got=sold.reduce((a,h)=>a+(+h.sold||0),0),cost=sold.reduce((a,h)=>a+(+h.paid||0)+(h.tc||0),0);
   const HOW=['','scrap yard','pawn shop','sold online','yard sale','kept it','gave away / tossed'];
   return `<div class="tot"><div><b>${haul.length}</b><span>picked up</span></div><div><b>${money(est)}</b><span>estimated</span></div><div><b>${money(got)}</b><span>sold so far (${sold.length})</span></div><div><b class="${got-cost<0?'neg':''}">${money(got-cost)}</b><span>profit on sold</span></div></div>
   <div class="sum">Paid for everything: ${money(paid)} · still to sell: ${haul.length-sold.length} items, about ${money(haul.filter(h=>h.sold==null||h.sold==='').reduce((a,h)=>a+(h.v||0),0))}</div>`+
-  haul.slice().reverse().map(h=>`<div class="hl"><div><div class="t">${h.u?`<a href="${esc(h.u)}" target="_blank" rel="noopener" style="color:inherit">${esc(h.t)}</a>`:esc(h.t)}</div><div class="m">${new Date(h.at).toLocaleDateString()} · ${esc(h.c||'item')} · estimated ${money(h.v||0)}</div></div>
-   <div class="d">${h.sold!=null&&h.sold!==''?money(h.sold-(+h.paid||0)):''}<small>${h.sold!=null&&h.sold!==''?'profit':'not sold'}</small></div>
+  haul.slice().reverse().map(h=>`<div class="hl"><div><div class="t">${h.u?`<a href="${esc(h.u)}" target="_blank" rel="noopener" style="color:inherit">${esc(h.t)}</a>`:esc(h.t)}</div><div class="m">${new Date(h.at).toLocaleDateString()} · ${esc(h.c||'item')} · estimated ${money(h.v||0)}${h.tmi!=null?` · trip ${h.tmi} mi, ${fmtMin(h.tmin)} = ${money(h.tc)}${h.tmiss?' (incl. '+h.tmiss+' missed stop'+(h.tmiss>1?'s':'')+')':''}`:''}</div></div>
+   <div class="d">${h.sold!=null&&h.sold!==''?money(h.sold-(+h.paid||0)-(h.tc||0)):''}<small>${h.sold!=null&&h.sold!==''?'profit':'not sold'}</small></div>
    <div class="hin"><input type="number" inputmode="decimal" min="0" placeholder="Paid $" aria-label="Paid" value="${h.paid||''}" data-hpaid="${esc(h.id)}"><input type="number" inputmode="decimal" min="0" placeholder="Sold for $" aria-label="Sold for" value="${h.sold??''}" data-hsold="${esc(h.id)}">
    <select data-hhow="${esc(h.id)}" aria-label="Where it went">${HOW.map(o=>`<option value="${o}"${h.how===o?' selected':''}>${o||'Where did it go?'}</option>`).join('')}</select><button data-hdel="${esc(h.id)}" aria-label="Remove">✕</button></div></div>`).join('')}
 function haulSet(id,f,v){const h=haul.find(x=>x.id===id);if(!h)return;h[f]=v;LS('sr_haul',haul);
@@ -433,7 +464,7 @@ function trackHeading(la,lo,manual){if(manual){hdg=null;lastFix=null;return}cons
     hdg={deg:(Math.atan2(y,x)*180/Math.PI+360)%360,mph:mv/Math.max(1,(now-lastFix.t)/36e5),at:now};lastFix={la,lo,t:now}}}else lastFix={la,lo,t:now}}
 function aheadOk(i,r){if(!cfg.ahead||!hdg||Date.now()-hdg.at>6e5||!me)return true;const dx=(i.lo-me.lo)*69.17*Math.cos(rad(me.la)),dy=(i.la-me.la)*69,hx=Math.sin(rad(hdg.deg)),hy=Math.cos(rad(hdg.deg));
   const along=dx*hx+dy*hy,side=Math.abs(dx*hy-dy*hx);return along>-0.3&&along<=Math.max(r,3)&&side<=Math.max(1.5,along*0.2)}
-function setMe(la,lo,manual){trackHeading(la,lo,manual);const first=!me;me={la,lo};meManual=manual;
+function setMe(la,lo,manual){trackHeading(la,lo,manual);if(!manual)trMove(la,lo);const first=!me;me={la,lo};meManual=manual;
   if(!meMark)meMark=L.marker([la,lo],{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[16,16],iconAnchor:[8,8]}),zIndexOffset:1000}).addTo(map);else meMark.setLatLng([la,lo]);
   if(first)map.setView([la,lo],11);else if(follow&&!manual)map.panTo([la,lo]);render();renderLinks()}
 async function load(fresh){try{
@@ -482,12 +513,14 @@ function renderLinks(){const a=searchArgs(),e=encodeURIComponent(a.q||'free'),pm
 document.addEventListener('click',async e=>{const t=e.target.closest('button,[data-mode]');if(!t)return;const d=t.dataset;
   if(d.mode){mode=d.mode;document.querySelectorAll('nav [data-mode]').forEach(b=>b.classList.toggle('on',b===t));['radar','search','watches','calls','haul'].forEach(m=>$('p-'+m).classList.toggle('show',m===mode));if(mode==='watches'||mode==='calls')send({c:'ping'});render();return}
   if(d.ad){const it=lookup(d.ad);if(it){adT.add(normT(it.t));LS('sr_adtitles',[...adT])}hidden.add(d.ad);run=run.filter(x=>x!==d.ad);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Hidden, along with any repeats of that ad');render()}
-  if(d.hide){hidden.add(d.hide);run=run.filter(x=>x!==d.hide);LS('sr_hidden',[...hidden]);LS('sr_run',run);render()}
+  if(d.hide){const it=lookup(d.hide);if(tr.on&&it&&me&&dist(me.la,me.lo,it.la,it.lo)<0.5)trStop('miss',it);hidden.add(d.hide);run=run.filter(x=>x!==d.hide);LS('sr_hidden',[...hidden]);LS('sr_run',run);render()}
+  if(d.trstart){trStart();return}if(d.trend){trEnd();return}if(d.trmiss){trStop('miss',null);toast('Logged as a missed stop: miles roll into the next pickup');render();return}
+  if(d.tdel){trips=trips.filter(t=>t.id!==d.tdel);trSave();render();return}
   if(d.hdel){haul=haul.filter(h=>h.id!==d.hdel);LS('sr_haul',haul);send({c:'sold',id:d.hdel,sold:null});render();return}
   if(d.more){openCards.has(d.more)?openCards.delete(d.more):openCards.add(d.more);render();return}
   if(d.sadd){const i=items.find(x=>x.id===d.sadd);if(i){addStops([i]);toast('Added to your run')}return}
   if(d.saddall){const sg=suggestions(5);addStops(sg);toast('Added '+sg.length+' stops along the way');return}
-  if(d.got){const it=lookup(d.got);haul.push({id:d.got,t:it?it.t:'',v:(it&&it.v&&it.v.best)||0,at:Date.now(),c:it&&it.c,src:it&&it.src,u:it&&it.u,paid:it&&it.p?Math.round(it.p):0,sold:null,how:''});LS('sr_haul',haul);hidden.add(d.got);run=run.filter(x=>x!==d.got);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Added to your haul');render()}
+  if(d.got){const it=lookup(d.got),al=trStop('got',it);haul.push({...(al?{tmi:+al.mi.toFixed(1),tmin:Math.round(al.min),tc:Math.round(tCost(al.mi,al.min)*100)/100,tmiss:al.missed}:{}),id:d.got,t:it?it.t:'',v:(it&&it.v&&it.v.best)||0,at:Date.now(),c:it&&it.c,src:it&&it.src,u:it&&it.u,paid:it&&it.p?Math.round(it.p):0,sold:null,how:''});LS('sr_haul',haul);hidden.add(d.got);run=run.filter(x=>x!==d.got);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Added to your haul');render()}
   if(d.run){const it=lookup(d.run);if(run.includes(d.run))run=run.filter(x=>x!==d.run);else{run=[...run,d.run];if(it)runItems[d.run]=it}
     Object.keys(runItems).forEach(k=>{if(!run.includes(k))delete runItems[k]});LS('sr_run',run);LS('sr_runitems',runItems);render()}
   if(d.msg){const i=enrich(lookup(d.msg));const m=msgFor(i);try{await navigator.clipboard.writeText(m);toast('Message copied. Paste it to the seller.')}catch(err){toast(m,8000)}window.open(i.u,'_blank','noopener')}
@@ -516,9 +549,9 @@ $('unlink').onclick=()=>{localStorage.removeItem('sr_pair');link=null;if(es)es.c
 $('copytopic').onclick=async()=>{try{await navigator.clipboard.writeText(link.alerts);toast('Topic copied: paste it into ntfy → Subscribe')}catch(e){toast(link.alerts,8000)}};
 $('cats').innerHTML=CATS.map(c=>`<button class="chip ${cfg.off.includes(c)?'off':''}" data-cat="${c}">${c}</button>`).join('');
 $('cats').onclick=e=>{const c=e.target.dataset.cat;if(!c)return;cfg.off=cfg.off.includes(c)?cfg.off.filter(x=>x!==c):[...cfg.off,c];e.target.classList.toggle('off');LS('sr_cfg',cfg);render()};
-$('rad').value=cfg.rad;$('min').value=cfg.min;$('age').value=cfg.age||'7';$('yardson').checked=cfg.yards!==false;$('price').value=cfg.price||'40';$('kind').value=cfg.kind||'items';$('sort').value=cfg.sort;$('mpg').value=cfg.mpg;$('gas').value=cfg.gas;$('block').value=cfg.block;
-const save=()=>{Object.assign(cfg,{mpg:+$('mpg').value||15,gas:+$('gas').value||0,rad:$('rad').value,min:$('min').value,age:$('age').value,price:$('price').value,kind:$('kind').value,sort:$('sort').value,block:$('block').value});LS('sr_cfg',cfg);render()};
-['mpg','gas','block'].forEach(k=>$(k).onchange=save);['rad','min','price','kind','sort','age'].forEach(k=>$(k).onchange=()=>{if(['min','price','kind','sort'].includes(k)){cfg.preset='';if(k!=='sort')cfg.focus=''}save()});$('src').onchange=$('end').onchange=render;$('q').oninput=render;
+$('rad').value=cfg.rad;$('min').value=cfg.min;$('age').value=cfg.age||'7';$('yardson').checked=cfg.yards!==false;$('price').value=cfg.price||'40';$('kind').value=cfg.kind||'items';$('sort').value=cfg.sort;$('mpg').value=cfg.mpg;$('gas').value=cfg.gas;$('wear').value=cfg.wear;$('hr').value=cfg.hr;$('block').value=cfg.block;
+const save=()=>{Object.assign(cfg,{mpg:+$('mpg').value||15,gas:+$('gas').value||0,wear:+$('wear').value||0,hr:+$('hr').value||0,rad:$('rad').value,min:$('min').value,age:$('age').value,price:$('price').value,kind:$('kind').value,sort:$('sort').value,block:$('block').value});LS('sr_cfg',cfg);render()};
+['mpg','gas','wear','hr','block'].forEach(k=>$(k).onchange=save);['rad','min','price','kind','sort','age'].forEach(k=>$(k).onchange=()=>{if(['min','price','kind','sort'].includes(k)){cfg.preset='';if(k!=='sort')cfg.focus=''}save()});$('src').onchange=$('end').onchange=render;$('q').oninput=render;
 $('clear').onclick=()=>{run=[];runItems={};LS('sr_run',run);LS('sr_runitems',runItems);render()};
 {const m=location.hash.match(/home=(-?[\d.]+),(-?[\d.]+)(?:,([^&]*))?/);if(m){home={la:+m[1],lo:+m[2],n:m[3]?decodeURIComponent(m[3]):'Home'};LS('sr_home',home);history.replaceState(null,'',location.pathname);setTimeout(()=>toast('Home set to '+home.n),800)}}
 $('sethome').onclick=()=>{if(me){home={la:me.la,lo:me.lo};LS('sr_home',home);$('sethome').textContent='Home saved';$('end').value='home';render()}};
@@ -548,7 +581,7 @@ $('tripplan').onclick=()=>{if(!rtOn())return toast('Set a route first.');const b
   pick.forEach(i=>{run.push(i.id);runItems[i.id]=i});LS('sr_run',run);LS('sr_runitems',runItems);$('end').value='dest';
   toast(kept?`Kept your ${kept} stop${kept>1?'s':''} and added ${pick.length} more along the route.`:`Planned ${pick.length} stops along your route, in order. Message sellers before you go.`,6000);render();$('run').scrollIntoView({behavior:'smooth'})};
 $('ahead').onclick=()=>{cfg.ahead=!cfg.ahead;LS('sr_cfg',cfg);if(cfg.ahead&&!hdg)toast('Road ahead turns on once you are driving: it follows the direction you are heading.');render()};
-$('list').addEventListener('change',e=>{const d=e.target.dataset;if(d.hpaid)haulSet(d.hpaid,'paid',e.target.value);else if(d.hsold)haulSet(d.hsold,'sold',e.target.value);else if(d.hhow)haulSet(d.hhow,'how',e.target.value)});
+$('list').addEventListener('change',e=>{const d=e.target.dataset;if(d.hpaid)haulSet(d.hpaid,'paid',e.target.value);else if(d.hsold)haulSet(d.hsold,'sold',e.target.value);else if(d.hhow)haulSet(d.hhow,'how',e.target.value);else if(d.tmi){const t=trips.find(x=>x.id===d.tmi);if(t){t.mi=+e.target.value||0;trSave();render()}}});
 $('modes').onclick=e=>{const b=e.target.closest('[data-preset]');if(b)applyPreset(b.dataset.preset)};
 $('advbtn').onclick=()=>{const o=$('adv').classList.toggle('show');$('advbtn').textContent=o?'Filters ▴':'Filters ▾';$('advbtn').setAttribute('aria-expanded',o)};
 $('freset').onclick=()=>{$('rad').value='10';$('src').value='';$('q').value='';applyPreset('best')};
