@@ -169,7 +169,7 @@ def src_trashnothing(seen, rows):
 
 def src_browser(seen, rows):
     p = "browser_rows.json"
-    if not os.path.exists(p) or time.time() - os.path.getmtime(p) > 8 * 3600: return
+    if not os.path.exists(p) or time.time() - os.path.getmtime(p) > 14 * 3600: return   # overnight gap (11 PM-7 AM) must not drop them
     for r in json.load(open(p, encoding="utf-8")).get("rows", []):
         lid = r["id"]
         if lid in seen: continue
