@@ -14,10 +14,12 @@ NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 SKIP = r"mattress|sofa|couch|love ?seat|recliner|sectional|\bcats?\b|kitten|\bdogs?\b|pupp(y|ies)|rooster|chicken|hens\b|animals|mulch|manure|\bdirt\b|topsoil|eggs?\b|egg carton|dinner|meal|pantry|pick-?up and disposal|removal|wanted|we need|i need|appraisal|valuing|service needed|styrofoam|christmas|halloween|isopod|rabbits?|bunn(y|ies)|goats?|ducks?|parrots?|cactus|aloe|digital|greeting card|incontinence|cpap|diabetic|pillow|crushed shell|bamboo|\bshow\b|koozies|jewels of opar|mocasin"
 RULES = [  # (category, score, regex) first match wins
- ("scrap", 5, r"copper|scrap|aluminum|stainless|\bmetals?\b|punch press|cnc|truck box"),
- ("electronics", 5, r"network|switch|access point|camera|server|laptop|computer"),
+ ("scrap", 5, r"copper|scrap|aluminum|alum\b|stainless|brass|\bmetals?\b|steel|iron\b|punch press|cnc|truck box|wire|radiator|batter(y|ies)|"
+            r"\ba/?c\b|air condition|condenser|compressor|hvac|window unit|water heater|filing cabinet|file cabinet|steel shelv|metal shelv|shelving|"
+            r"locker|safe\b|motorcycle|dirt ?bike|scooter|moped|\batv\b|go ?kart|boat trailer|utility trailer|jet ?ski|outboard|generator|copier"),
+ ("electronics", 5, r"network|switch|access point|camera|server|laptop|computer|\bpc\b|desktop|printer|stereo|receiver|amplifier|speakers?|circuit|electronics|projector|ups\b"),
  ("vehicle", 4, r"boat|trailer|camper|power chair|\bmotor\b|engine|tire|sprocket|brake|truck bed|hover ?board"),
- ("appliance", 4, r"washer|washing machine|dryer|stove|fridge|refrigerator|dishwasher|microwave|appliance|grill|smoker|garage opener|copier"),
+ ("appliance", 5, r"washer|washing machine|dryer|stove|fridge|refrigerator|dishwasher|microwave|appliance|grill|smoker|garage opener|copier"),
  ("electronics", 4, r"monitor|receiver|printer|solar|\btvs?\b|vizio|visio|sony|typewriter|converter|vacuum|inverter|handset"),
  ("resale", 4, r"vinyl|records|tool|paddle board|bike|bicycle|mower|impact window|basketball|treadmill|exercise|gym|shelving|cages|filing cabinet|diesel|hot tub|shed|hospital bed|drexel|ethan allen|home brew"),
  ("materials", 3, r"plywood|lumber|planks|pallets?|\bwood\b|tile|door|sinks?|faucet|countertop|fence|trim|beadboard|t1-11|drywall|window|plumbing|hinges|clamps|hoses|supply lines|fluorescent|roofing|marble|shop light|buckets?"),
