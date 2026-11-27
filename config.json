@@ -2,9 +2,9 @@
   "scans": [
     {
       "site": "tampa",
-      "lat": 27.95,
-      "lon": -82.46,
-      "miles": 40
+      "lat": 27.9725,
+      "lon": -82.3758,
+      "miles": 50
     },
     {
       "site": "lakeland",
@@ -17,12 +17,6 @@
       "lat": 27.45,
       "lon": -82.53,
       "miles": 25
-    },
-    {
-      "site": "orlando",
-      "lat": 28.3,
-      "lon": -81.62,
-      "miles": 20
     }
   ],
   "cl_queries": [
@@ -31,8 +25,15 @@
     "scrap",
     "free",
     "must go",
-    "come get it",
-    "haul away"
+    "haul away",
+    "appliance",
+    "washer",
+    "copier",
+    "shelving",
+    "filing cabinet",
+    "motorcycle",
+    "trailer",
+    "air conditioner"
   ],
   "offerup_zips": [
     "33602",
@@ -90,7 +91,9 @@
   "offerup_queries": [
     "free",
     "curb",
-    "scrap"
+    "scrap",
+    "free appliance",
+    "free metal"
   ],
   "home_area": "lakeland",
   "browser_every_min": 60,
@@ -169,22 +172,9 @@
   ],
   "fight_the_blight_url": "https://hcfl.gov/residents/property-owners-and-renters/code-violations/fight-the-blight",
   "cheap_max": 40,
-  "cheap_queries": [
-    "scrap metal",
-    "copper",
-    "aluminum",
-    "generator",
-    "lawn mower",
-    "pressure washer",
-    "air compressor",
-    "power tools",
-    "welder",
-    "bicycle"
-  ],
-  "cheap_queries_ou": [
-    "scrap",
-    "tools",
-    "mower"
-  ],
-  "alert_radius_mi": 20
+  "cheap_queries": [],
+  "cheap_queries_ou": [],
+  "alert_radius_mi": 20,
+  "free_only": true,
+  "radius_from_base_mi": 50
 }
