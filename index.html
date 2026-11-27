@@ -80,7 +80,14 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 
 <div class="panel show" id="p-radar">
 <div id="tip" style="display:none"><span style="flex:1"><b>Quick start:</b> pick a mode below, then tap <b>Plan my run</b>. On any card: <b>Add to run</b>, <b>Message</b> the seller, or <b>Navigate</b>. Tap <b>Filters</b> to fine-tune.</span><button id="tipx" aria-label="Dismiss">Got it</button></div>
-<div class="bar modes" id="modes"><button data-preset="best">⭐ Best near me</button><button data-preset="free">Free only</button><button data-preset="scrap">Scrap metal</button><button data-preset="flip">Big flips</button><button data-preset="yard">Yard sales</button><button id="ahead" title="Only show finds along the road ahead while you drive">🚗 Road ahead</button></div>
+<div class="bar modes" id="modes"><button data-preset="best">⭐ Best near me</button><button data-preset="free">Free only</button><button data-preset="scrap">Scrap metal</button><button data-preset="flip">Big flips</button><button data-preset="yard">Yard sales</button><button id="routebtn" title="Plot a route and find finds along it">🧭 Route</button><button id="ahead" title="Only show finds along the road ahead while you drive">🚗 Road ahead</button></div>
+<div class="bar" id="tripbar" style="display:none">
+  <input id="tripq" placeholder="Where are you headed? Address, town or place" style="flex:1 1 210px" enterkeyhint="go" autocomplete="off">
+  <button id="tripgo" class="go">Route</button><button id="trippick" title="Tap the map where you are headed">Tap map</button>
+  <select id="tripw" aria-label="How far off the route"><option value="1">Within 1 mi of route</option><option value="2" selected>Within 2 mi of route</option><option value="5">Within 5 mi of route</option></select>
+  <button id="tripplan" class="add">Plan pickups along route</button><button id="tripx">Clear route</button>
+  <div id="tripsum" style="flex-basis:100%;font-size:12.5px;color:var(--mut)"></div>
+</div>
 <div class="bar fbar"><button id="advbtn" aria-expanded="false">Filters ▾</button><span id="fsum"></span><button id="autoplan" class="go">Plan my run</button></div>
 <div class="bar" id="adv">
   <select id="age" aria-label="Posted within"><option value="1">Posted today</option><option value="3">Last 3 days</option><option value="7" selected>Last 7 days</option><option value="any">Any age</option></select>
@@ -110,7 +117,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 <div id="run">
   <h2>My pickup run</h2>
   <div class="bar" style="padding:0;background:none;border:0">
-    <select id="end" aria-label="Where the run ends"><option value="last">End at last stop</option><option value="start">Return to where I am</option><option value="home">End at home</option><option value="yard">End at nearest scrap yard</option></select>
+    <select id="end" aria-label="Where the run ends"><option value="last">End at last stop</option><option value="start">Return to where I am</option><option value="home">End at home</option><option value="yard">End at nearest scrap yard</option><option value="dest">End at route destination</option></select>
     <button id="sethome">Set home = here</button><button id="clear">Clear run</button>
   </div>
   <ol id="stops"></ol><div class="sum" id="sum"></div>
@@ -206,13 +213,14 @@ function renderRun(){
   runLayer.clearLayers();const stops=run.map(lookup).filter(Boolean);
   $('run').style.display=stops.length?'block':'none';if(!stops.length)return;
   const start=me||{la:stops[0].la,lo:stops[0].lo},m=$('end').value;let end=m==='start'?start:m==='home'?home:null;
+  if(m==='dest'&&rt&&rt.dest)end={la:rt.dest.la,lo:rt.dest.lo,n:rt.dest.n};
   if(m==='yard'){const ys=(yards||[]).filter(y=>y.k==='scrap'||y.k==='recycle');if(ys.length){const last=plan(start,stops,null).order.slice(-1)[0];end=ys.reduce((a,b)=>dist(last.la,last.lo,b.la,b.lo)<dist(last.la,last.lo,a.la,a.lo)?b:a);end={la:end.la,lo:end.lo,n:end.n}}}
   const p=plan(start,stops,end),path=[[start.la,start.lo],...p.order.map(s=>[s.la,s.lo])];if(end)path.push([end.la,end.lo]);
   L.polyline(path,{color:'#4ade80',weight:4,opacity:.8}).addTo(runLayer);
   p.order.forEach((s,i)=>L.marker([s.la,s.lo],{icon:L.divIcon({className:'',html:`<div class="num">${i+1}</div>`,iconSize:[22,22],iconAnchor:[11,11]}),zIndexOffset:900}).addTo(runLayer).bindPopup(esc(s.t)));
   let prev=start;$('stops').innerHTML=p.order.map(s=>{const leg=dist(prev.la,prev.lo,s.la,s.lo);prev=s;return `<li>${esc(s.t)} <span style="color:var(--mut)">· ${esc(s.h)} · ${leg.toFixed(1)} mi leg${s.p?' · $'+Math.round(s.p):''}</span></li>`}).join('');
   const drive=p.miles*1.3,worth=p.order.reduce((a,s)=>a+((s.v&&s.v.best)||0),0),cost=p.order.reduce((a,s)=>a+(s.p||0),0),fuel=drive/cfg.mpg*cfg.gas;
-  $('sum').textContent=`${p.order.length} stops · about ${drive.toFixed(0)} road miles · worth about ${money(worth)}${cost?', costs '+money(cost):''}, gas about ${money(fuel)} → net about ${money(worth-cost-fuel)}${m==='home'&&!home?' · home not set: tap "Set home = here" when you are home':''}${m==='yard'&&end?' · ends at '+esc(end.n||'scrap yard'):''}${m==='yard'&&!end?' · scrap yard list still loading':''}${me?'':' · no GPS yet, starting from the first stop'}${p.order.length>9?' · Google Maps takes 9 stops per link; the link covers the first 9':''}`;
+  $('sum').textContent=`${p.order.length} stops · about ${drive.toFixed(0)} road miles · worth about ${money(worth)}${cost?', costs '+money(cost):''}, gas about ${money(fuel)} → net about ${money(worth-cost-fuel)}${m==='home'&&!home?' · home not set: tap "Set home = here" when you are home':''}${m==='dest'&&end?' · ends at '+esc(end.n||'destination'):''}${m==='dest'&&!end?' · no route set':''}${m==='yard'&&end?' · ends at '+esc(end.n||'scrap yard'):''}${m==='yard'&&!end?' · scrap yard list still loading':''}${me?'':' · no GPS yet, starting from the first stop'}${p.order.length>9?' · Google Maps takes 9 stops per link; the link covers the first 9':''}`;
   const o=p.order.slice(0,9),dest=end||o[o.length-1],way=(end?o:o.slice(0,-1)).map(s=>s.la+','+s.lo).join('|');
   $('gmaps').href=`https://www.google.com/maps/dir/?api=1${me?`&origin=${me.la},${me.lo}`:''}&destination=${dest.la},${dest.lo}${way?'&waypoints='+encodeURIComponent(way):''}&travelmode=driving`;
 }
@@ -244,7 +252,7 @@ function heroPick(rows){const c=rows.filter(i=>!run.includes(i.id)&&i.dm!=null&&
   const sc=i=>i.net+(i.px==='exact'?10:0)-Math.min(20,(Date.now()-when(i))/864e5*3);return c.reduce((a,b)=>sc(b)>sc(a)?b:a)}
 const bearingLbl=d=>['N','NE','E','SE','S','SW','W','NW'][Math.round(d/45)%8]+'-bound';
 function fsumText(){const o=t=>$(t).selectedOptions[0].textContent;const pr={best:'⭐ Best near me',free:'Free only',scrap:'Scrap metal',flip:'Big flips',yard:'Yard sales'}[cfg.preset];
-  return `${pr?'<b style="color:var(--tx)">'+pr+'</b> · ':''}${cfg.preset==='free'?'':o('price')+' · '}${o('rad')} · ${o('age').toLowerCase()} · ${o('sort').toLowerCase()}${cfg.ahead?(hdg&&Date.now()-hdg.at<6e5?' · 🚗 road ahead ('+bearingLbl(hdg.deg)+')':' · 🚗 road ahead: starts once you are moving'):''}${$('src').value?' · '+o('src'):''}${$('q').value?' · "'+esc($('q').value)+'"':''}`}
+  return `${pr?'<b style="color:var(--tx)">'+pr+'</b> · ':''}${cfg.preset==='free'?'':o('price')+' · '}${o('rad')} · ${o('age').toLowerCase()} · ${o('sort').toLowerCase()}${rtOn()?' · 🧭 along route ('+$('tripw').value+' mi)':''}${cfg.ahead?(hdg&&Date.now()-hdg.at<6e5?' · 🚗 road ahead ('+bearingLbl(hdg.deg)+')':' · 🚗 road ahead: starts once you are moving'):''}${$('src').value?' · '+o('src'):''}${$('q').value?' · "'+esc($('q').value)+'"':''}`}
 function haulHTML(){if(!haul.length)return '<div class="empty">Nothing in your haul yet. Tap "Got it" on a card when you pick something up.</div>';
   const est=haul.reduce((a,h)=>a+(h.v||0),0),paid=haul.reduce((a,h)=>a+(+h.paid||0),0),sold=haul.filter(h=>h.sold!=null&&h.sold!=='');
   const got=sold.reduce((a,h)=>a+(+h.sold||0),0),cost=sold.reduce((a,h)=>a+(+h.paid||0),0);
@@ -257,8 +265,31 @@ function haulHTML(){if(!haul.length)return '<div class="empty">Nothing in your h
    <select data-hhow="${esc(h.id)}" aria-label="Where it went">${HOW.map(o=>`<option value="${o}"${h.how===o?' selected':''}>${o||'Where did it go?'}</option>`).join('')}</select><button data-hdel="${esc(h.id)}" aria-label="Remove">✕</button></div></div>`).join('')}
 function haulSet(id,f,v){const h=haul.find(x=>x.id===id);if(!h)return;h[f]=v;LS('sr_haul',haul);
   if(f==='sold'||f==='paid'||f==='how')send({c:'sold',id:h.id,title:h.t,cat:h.c,src:h.src,est:h.v,paid:+h.paid||0,sold:h.sold===''||h.sold==null?null:+h.sold,how:h.how});render()}
+let rt=LS('sr_route')||null,rtPick=false;const rtLayer=L.layerGroup().addTo(map);
+const rtOn=()=>!!(cfg.routeOn&&rt&&rt.pts&&rt.pts.length>1);
+function offRoute(i){if(!rt||!rt.xy)return{off:1e9,along:0};const k=Math.cos(rad(rt.pts[0][0])),px=i.lo*69.17*k,py=i.la*69;let best=1e9,al=0;
+  for(let j=0;j<rt.xy.length-1;j++){const[ax,ay,ac]=rt.xy[j],[bx,by]=rt.xy[j+1],dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy;let t=L2?((px-ax)*dx+(py-ay)*dy)/L2:0;t=Math.max(0,Math.min(1,t));
+    const d=Math.hypot(px-(ax+t*dx),py-(ay+t*dy));if(d<best){best=d;al=ac+t*Math.sqrt(L2)}}return{off:best,along:al}}
+function prepRoute(){if(!rt)return;const k=Math.cos(rad(rt.pts[0][0]));let acc=0;rt.xy=rt.pts.map((p,j)=>{const x=p[1]*69.17*k,y=p[0]*69;if(j){const q=rt.pts[j-1];acc+=Math.hypot(x-q[1]*69.17*k,y-q[0]*69)}return[x,y,acc]});rt.len=acc}
+function drawRoute(){rtLayer.clearLayers();if(!rtOn())return;L.polyline(rt.pts,{color:'#38bdf8',weight:5,opacity:.75}).addTo(rtLayer);
+  L.marker(rt.pts[rt.pts.length-1],{icon:L.divIcon({className:'',html:'<div class="num" style="background:#38bdf8">⚑</div>',iconSize:[22,22],iconAnchor:[11,11]})}).addTo(rtLayer).bindPopup(esc(rt.dest.n||'Destination'))}
+async function geocode(q){const vb='&viewbox=-83.2,29.2,-80.8,26.6&bounded=0';
+  const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us'+vb+'&q='+encodeURIComponent(q),{headers:{Accept:'application/json'}}).then(r=>r.json());
+  if(!r.length)throw new Error('not found');return{la:+r[0].lat,lo:+r[0].lon,n:r[0].display_name.split(',').slice(0,3).join(',')}}
+async function buildRoute(dest){const from=me||home;if(!from){toast('Need your position first: allow GPS or tap the map where you are.');return}
+  $('tripsum').textContent='Getting the driving route…';let pts,mi,mins;
+  try{const j=await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lo},${from.la};${dest.lo},${dest.la}?overview=full&geometries=geojson`).then(r=>r.json());
+    const g=j.routes[0];pts=g.geometry.coordinates.map(c=>[c[1],c[0]]);mi=g.distance/1609.34;mins=g.duration/60}
+  catch(e){pts=[[from.la,from.lo],[dest.la,dest.lo]];mi=dist(from.la,from.lo,dest.la,dest.lo)*1.3;mins=mi/40*60;toast('Road route unavailable, using a straight line for now.')}
+  const step=Math.max(1,Math.floor(pts.length/400));pts=pts.filter((p,j)=>j%step===0||j===pts.length-1);
+  rt={dest,from:{la:from.la,lo:from.lo},pts,mi,mins,at:Date.now()};LS('sr_route',rt);prepRoute();cfg.routeOn=true;LS('sr_cfg',cfg);$('end').value='dest';
+  map.fitBounds(L.latLngBounds(pts),{padding:[20,20]});follow=false;drawRoute();render()}
+function tripSum(rows){if(!rt)return'Type a destination or tap "Tap map", then tap Route.';const n=rows.filter(i=>!run.includes(i.id)).length;
+  return `To <b style="color:var(--tx)">${esc(rt.dest.n||'destination')}</b>: ${rt.mi.toFixed(0)} mi, about ${Math.round(rt.mins)} min · ${n} finds within ${$('tripw').value} mi of the route, sorted by payoff after the detour.`}
 function roi(i){const b=(i.v&&i.v.best)||0;return (b-(i.p||0)-(i.fuel||0))/Math.max(1,(i.p||0)+(i.fuel||0))}
-function enrich(i){const dm=me?dist(me.la,me.lo,i.la,i.lo):null,best=(i.v&&i.v.best)||0,fuel=dm==null?0:trip(dm*2);return{...i,dm,fuel,net:best-(i.p||0)-fuel}}
+function enrich(i){const dm=me?dist(me.la,me.lo,i.la,i.lo):null,best=(i.v&&i.v.best)||0;
+  if(mode==='radar'&&rtOn()){const o=offRoute(i),fuel=trip(o.off*2);return{...i,dm,off:o.off,along:o.along,fuel,net:best-(i.p||0)-fuel}}
+  const fuel=dm==null?0:trip(dm*2);return{...i,dm,fuel,net:best-(i.p||0)-fuel}}
 function etaFor(i){if(i.dm==null)return'today';const t=new Date(Date.now()+(i.dm*1.3/35*60+20)*60000);t.setMinutes(Math.ceil(t.getMinutes()/15)*15,0,0);
   if(t.getDate()!==new Date().getDate()||t.getHours()>=21)return'tomorrow morning';if(t.getHours()<8)return'later this morning';return'around '+t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
 function msgFor(i){const s=i.t.replace(/\b(free|curb alert)\b/ig,'').replace(/[*!]+/g,'').trim()||i.t;return `Hi! Is the ${s} still available? I can come pick it up ${etaFor(i)}. Thanks, Austin`}
@@ -271,7 +302,7 @@ function callBox(i){const c=calls[i.id];if(!c)return'';const st=c.status;
   return `<div class="callres">${esc(c.note||st)}${tel}</div>`}
 function card(i){const old=Date.now()-when(i)>3*864e5,ft=fit(i);const isNew=mode==='radar'&&!firstRun&&!seen.has(i.id),inRun=run.includes(i.id),v=i.v;
   const val=v?`<div class="val">${i.p>1?`Asking <b>${money(i.p)}</b> · `:''}${v.rh?`Resale about <b>${money(v.rl)}–${money(v.rh)}</b>`:''}${v.rh&&v.sc?' · ':''}${v.sc?`Scrap about <b>${money(v.sc)}</b> (${v.w} lb ${v.m})`:''}${!v.rh&&!v.sc?'No clear value from the title':''}${i.dm!=null&&(v.best||i.p)?` · gas ${money(i.fuel)} round trip → <b class="${i.net<0?'neg':''}">net ${i.net<0?'-':''}${money(Math.abs(i.net))}</b>`:''}<br><span style="color:var(--mut);font-size:12px">${v.by==='ai'?'AI estimate from the title':'Rule-of-thumb weight'} · ${v.cf} confidence${v.why?' · '+esc(v.why):''}</span></div>`:(i.p?`<div class="val">Asking <b>${money(i.p)}</b> · value estimate coming</div>`:'');
-  return `<div class="card s${i.s||1}${isNew?' new':''}${inRun?' in':''}${old?' old':''}">${i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}${v&&v.best?`<small>worth ~${money(v.best)}</small>`:''}</div>`:''}${i.img?`<img class="thumb" loading="lazy" alt="" src="${esc(i.img)}">`:''}<div class="t">${esc(i.t)}</div>
+  return `<div class="card s${i.s||1}${isNew?' new':''}${inRun?' in':''}${old?' old':''}">${i.off!=null&&i.off<1e8?`<div class="d">${i.off<0.15?'on route':i.off.toFixed(1)+' mi off'}${v&&v.best?`<small>worth ~${money(v.best)}</small>`:''}</div>`:i.dm!=null?`<div class="d">${i.dm.toFixed(1)} mi ${bearing(me.la,me.lo,i.la,i.lo)}${v&&v.best?`<small>worth ~${money(v.best)}</small>`:''}</div>`:''}${i.img?`<img class="thumb" loading="lazy" alt="" src="${esc(i.img)}">`:''}<div class="t">${esc(i.t)}</div>
     <div class="m">${i.p>0?`<span class="tag" style="color:#fbbf24">$${Math.round(i.p)}</span>`:'<span class="tag" style="color:#4ade80">free</span>'}${kindOf(i)==='yard'?'<span class="tag" style="color:#fb923c">yard sale</span>':''}<span class="tag">${esc(i.c||'item')}</span><span class="tag">${SRC[i.src]||'Craigslist'}</span>${i.also&&i.also.length?`<span class="tag also">also on ${[...new Set(i.also)].map(x=>SRC[x]||x).join(', ')}</span>`:''}${ft?`<span class="tag fit">${ft}</span>`:''}${i.watch?`<span class="tag" style="color:var(--srch)">watch: ${esc(i.watch)}</span>`:''}${isNew?'<span class="tag" style="color:#4ade80">new</span>':''}${esc(i.h)} · ${i.px==='exact'?'pin exact':'pin approximate'}${i.posted?' · posted '+age(i.posted):''}</div>
     ${i.n?`<div class="n">${esc(i.n)}</div>`:''}${val}${callBox(i)}
     <div class="acts"><button class="${inRun?'':'add'}" data-run="${esc(i.id)}">${inRun?'Remove from run':'Add to run'}</button>${i.src==='cl'||!i.src?`<button data-check="${esc(i.id)}">Check availability</button>`:''}<button data-msg="${esc(i.id)}">Message</button><a href="https://www.google.com/maps/dir/?api=1&destination=${i.la},${i.lo}" target="_blank" rel="noopener">Navigate</a><a href="${esc(i.u)}" target="_blank" rel="noopener">Listing</a><button data-got="${esc(i.id)}">Got it</button><button data-hide="${esc(i.id)}">Gone / skip</button><button data-ad="${esc(i.id)}" title="Hide this and every listing with the same title">Ad / spam</button></div></div>`}
@@ -283,7 +314,7 @@ function render(){
   if(mode==='radar'){const r=+$('rad').value,min=+$('min').value,src=$('src').value,q=$('q').value.trim().toLowerCase(),pv=$('price').value,kv=$('kind').value;
     const av=$('age').value,fo=FOCUS[cfg.focus];
     rows=dedupe(items.map(i=>({...i,also:null})).filter(i=>run.includes(i.id)||(keep(i)&&priceOk(i,pv)&&kindOk(i,kv)&&ageOk(i,av)&&(kv==='yardonly'||i.s>=min)&&(!fo||fo(i))&&aheadOk(i,r)&&(!src||i.src===src)&&(!q||(i.t+' '+i.h).toLowerCase().includes(q))))).map(enrich);
-    if(me)rows=rows.filter(i=>i.dm<=r||run.includes(i.id))}
+    if(rtOn()){const w=+$('tripw').value;rows=rows.filter(i=>i.off<=w||run.includes(i.id))}else if(me)rows=rows.filter(i=>i.dm<=r||run.includes(i.id))}
   else if(mode==='search'){rows=(search&&search.items||[]).filter(keep).map(enrich);pinColor='#a78bfa'}
   else if(mode==='watches'){rows=hits.filter(keep).map(enrich);pinColor='#a78bfa'}
   else if(mode==='haul'){rows=[]}
@@ -295,14 +326,14 @@ function render(){
     .bindPopup(`<b>${esc(i.t)}</b><br>${esc(i.h)}${i.p?' · $'+Math.round(i.p):''}<br><a href="${esc(i.u)}" target="_blank" rel="noopener">Open listing</a>`));
   if(ring){ring.remove();ring=null}
   const rr=mode==='search'?+$('srad').value:+$('rad').value;
-  if(me&&rr<900&&(mode==='radar'||mode==='search'))ring=L.circle([me.la,me.lo],{radius:rr*1609.34,color:mode==='search'?'#a78bfa':'#4ade80',weight:1,fillOpacity:.05}).addTo(map);
+  if(me&&rr<900&&(mode==='search'||(mode==='radar'&&!rtOn())))ring=L.circle([me.la,me.lo],{radius:rr*1609.34,color:mode==='search'?'#a78bfa':'#4ade80',weight:1,fillOpacity:.05}).addTo(map);
   let head='';
   if(mode==='search'){head=search?`<div class="sum">${search.state==='searching'?'Your PC is searching for "'+esc(search.q)+'"…':search.state==='estimating'?'Results for "'+esc(search.q)+'" · estimating values…':'Results for "'+esc(search.q)+'" · '+rows.length+' shown'}${search.errs&&Object.keys(search.errs).length?' · couldn\'t search '+Object.keys(search.errs).map(k=>SRC[k]).join(', '):''}</div>`:'<div class="empty">Type what you are after and tap "Scan with my PC", or open the search on any site with the buttons above.</div>'}
   if(mode==='watches')head=watchList.length?watchList.map(w=>`<div class="watch"><div><b>${esc(w.q)}</b><div class="m">${w.free?'free only':w.max==null?'any price':'up to $'+w.max} · ${w.r} mi · ${w.hits||0} new matches so far</div></div><button data-unwatch="${esc(w.id)}">Stop</button></div>`).join('')+(rows.length?'<div class="sum">Recent matches</div>':''):`<div class="empty">${link?'No watches yet. Search for something, then tap "Watch this search".':'Link your PC first (Settings ⚙︎).'}</div>`;
   if(mode==='haul')head=haulHTML();
   if(mode==='calls'&&!rows.length)head='<div class="empty">No availability checks yet. Tap "Check availability" on a Craigslist listing.</div>';
   if(mode==='radar'){const h=me&&heroPick(rows);if(h){head+=`<div class="card hero"><div class="lbl">BEST PICKUP RIGHT NOW</div>${card(h).replace(/^<div class="card[^"]*">/,'')}`;rows=rows.filter(i=>i.id!==h.id)}
-    $('fsum').innerHTML=fsumText();document.querySelectorAll('#modes [data-preset]').forEach(b=>b.classList.toggle('on',b.dataset.preset===cfg.preset));$('ahead').classList.toggle('on',!!cfg.ahead)}
+    $('fsum').innerHTML=fsumText();document.querySelectorAll('#modes [data-preset]').forEach(b=>b.classList.toggle('on',b.dataset.preset===cfg.preset));$('ahead').classList.toggle('on',!!cfg.ahead);$('routebtn').classList.toggle('on',!!cfg.routeOn);$('tripbar').style.display=cfg.routeOn?'flex':'none';$('tripsum').innerHTML=tripSum(rows)}
   $('list').innerHTML=head+(rows.length?rows.map(card).join(''):(mode==='radar'?`<div class="empty">${me?'Nothing in range with these filters. Widen the range, allow cheap items, lower the value filter, or turn categories back on in Settings.':'Waiting for GPS. Tap the map to set your position by hand.'}</div>`:''));
   const on=link&&pc&&pc.last&&Date.now()-pc.last<6*60e3;
   const nFree=items.filter(i=>!(i.p>0)&&kindOf(i)==='').length,nCheap=items.filter(i=>i.p>0&&kindOf(i)==='').length;
@@ -407,11 +438,24 @@ $('recenter').onclick=()=>{follow=true;if(me)map.setView([me.la,me.lo],Math.max(
 $('voice').onclick=()=>{voice=!voice;$('voice').textContent='Voice alerts '+(voice?'on':'off');$('voice').classList.toggle('on',voice);if(voice&&window.speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance('Voice alerts on'))};
 $('showhidden').onclick=()=>{hidden=new Set();adT=new Set();LS('sr_hidden',[]);LS('sr_adtitles',[]);render()};
 $('resethaul').onclick=()=>{haul=[];LS('sr_haul',haul);render()};
-map.on('click',e=>{if(!me||meManual)setMe(e.latlng.lat,e.latlng.lng,true)});
+map.on('click',e=>{if(rtPick){rtPick=false;buildRoute({la:e.latlng.lat,lo:e.latlng.lng,n:'the spot you picked'});return}if(!me||meManual)setMe(e.latlng.lat,e.latlng.lng,true)});
 if(navigator.geolocation)navigator.geolocation.watchPosition(p=>setMe(p.coords.latitude,p.coords.longitude,false),()=>render(),{enableHighAccuracy:true,maximumAge:15000,timeout:30000});
 if(navigator.wakeLock){const wl=()=>navigator.wakeLock.request('screen').catch(()=>{});wl();document.addEventListener('visibilitychange',()=>document.visibilityState==='visible'&&wl())}
 if(location.hash==='#events'){evOpen=true}
 if(location.hash==='#watches')setTimeout(()=>document.querySelector('[data-mode=watches]').click(),0);
+$('routebtn').onclick=()=>{cfg.routeOn=!cfg.routeOn;LS('sr_cfg',cfg);drawRoute();render();if(cfg.routeOn&&!rt)setTimeout(()=>$('tripq').focus(),50)};
+$('tripgo').onclick=async()=>{const q=$('tripq').value.trim();if(!q)return toast('Type where you are headed, or use Tap map.');try{const d=await geocode(q);buildRoute(d)}catch(e){toast('Could not find that place. Try adding the town, e.g. "Walmart Plant City".')}};
+$('tripq').onkeydown=e=>{if(e.key==='Enter')$('tripgo').click()};
+$('trippick').onclick=()=>{rtPick=true;toast('Tap the map where you are headed.')};
+$('tripw').onchange=()=>render();
+$('tripx').onclick=()=>{rt=null;LS('sr_route',null);rtLayer.clearLayers();if($('end').value==='dest')$('end').value='last';render()};
+$('tripplan').onclick=()=>{if(!rtOn())return toast('Set a route first.');const br=blockRe(),w=+$('tripw').value,pv=$('price').value;
+  const pool=items.filter(i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)===''&&priceOk(i,pv)&&i.s>=3&&i.v&&i.v.best>=15)
+    .map(i=>{const o=offRoute(i);return{...i,off:o.off,along:o.along,net:i.v.best-(i.p||0)-trip(o.off*2)}}).filter(i=>i.off<=w&&i.net>5);
+  pool.sort((a,b)=>(b.net+(b.px==='exact'?10:0))-(a.net+(a.px==='exact'?10:0)));const pick=pool.slice(0,8).sort((a,b)=>a.along-b.along);
+  if(!pick.length)return toast('Nothing worth stopping for within '+w+' mi of this route. Try a wider corridor or the Filters.');
+  run=pick.map(i=>i.id);runItems={};pick.forEach(i=>runItems[i.id]=i);LS('sr_run',run);LS('sr_runitems',runItems);$('end').value='dest';
+  toast(`Planned ${pick.length} stops along your route, in order. Message sellers before you go.`,6000);render();$('run').scrollIntoView({behavior:'smooth'})};
 $('ahead').onclick=()=>{cfg.ahead=!cfg.ahead;LS('sr_cfg',cfg);if(cfg.ahead&&!hdg)toast('Road ahead turns on once you are driving: it follows the direction you are heading.');render()};
 $('list').addEventListener('change',e=>{const d=e.target.dataset;if(d.hpaid)haulSet(d.hpaid,'paid',e.target.value);else if(d.hsold)haulSet(d.hsold,'sold',e.target.value);else if(d.hhow)haulSet(d.hhow,'how',e.target.value)});
 $('modes').onclick=e=>{const b=e.target.closest('[data-preset]');if(b)applyPreset(b.dataset.preset)};
@@ -422,6 +466,7 @@ $('recenter2').onclick=()=>$('recenter').click();
 if(!LS('sr_tip'))$('tip').style.display='flex';$('tipx').onclick=()=>{$('tip').style.display='none';LS('sr_tip',1)};
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 {const c0=LS('sr_cfg');if(!c0||c0.preset===undefined)applyPreset('best')}
+if(rt){prepRoute();drawRoute()}
 loadYards();renderLinks();setupLink();load();loadEvents();setInterval(loadEvents,3600e3);setInterval(()=>load(false),180000);setInterval(()=>{if(link)send(me&&!meManual?{c:'ping',la:+me.la.toFixed(3),lo:+me.lo.toFixed(3)}:{c:'ping'})},300000);
 window.addEventListener('pagehide',()=>{items.forEach(i=>seen.add(i.id));LS('sr_seen',[...seen])});
 </script></body></html>
