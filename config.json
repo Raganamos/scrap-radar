@@ -78,7 +78,7 @@
   },
   "estimate_model": "qwen3.5:9b",
   "max_estimates_per_run": 150,
-  "alert_min_value": 60,
+  "alert_min_value": 40,
   "call_hours": [
     9,
     20
@@ -86,14 +86,14 @@
   "max_calls_per_day": 12,
   "retell_from_number": null,
   "retell_voice_from_agent": "agent_825e9bad62cdb077764a8fc153",
-  "watch_every_min": 30,
+  "watch_every_min": 15,
   "offerup_queries": [
     "free",
     "curb",
     "scrap"
   ],
   "home_area": "lakeland",
-  "browser_every_min": 180,
+  "browser_every_min": 60,
   "calendar_events": [
     {
       "id": "usf-fall26",
@@ -185,5 +185,6 @@
     "scrap",
     "tools",
     "mower"
-  ]
+  ],
+  "alert_radius_mi": 20
 }
