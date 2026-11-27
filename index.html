@@ -58,6 +58,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 .hl{display:grid;grid-template-columns:1fr auto;gap:4px 10px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .hl .hin{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}.hl input{width:92px}.hl select{flex:1 1 110px}
 .tot{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}.tot div{background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px 4px}.tot b{display:block;font:700 17px ui-monospace,monospace;color:var(--go)}.tot span{font-size:11.5px;color:var(--mut)}
+.sg{display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}.sg .st{flex:1;min-width:0}.sg .st div{font-size:12.5px;color:var(--mut)}.sg button{flex:0 0 auto}
 .yard{width:14px;height:14px;border-radius:3px;border:2px solid #0b100d}
 #tip{font-size:13px;color:var(--mut);padding:8px 12px;background:#101c14;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}#tip b{color:var(--tx)}
 .leaflet-container{background:#0e1511}.leaflet-tile{filter:brightness(.72) contrast(1.1) saturate(.6)}
@@ -122,6 +123,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
   </div>
   <ol id="stops"></ol><div class="sum" id="sum"></div>
   <div class="acts"><a id="gmaps" target="_blank" rel="noopener" class="add">Drive this route in Google Maps</a></div>
+  <div id="sugg"></div>
 </div>
 <div id="events" style="padding:0 10px;max-width:760px;margin:auto"></div><div id="list"></div><div class="toast" id="toast"></div>
 <script>
@@ -209,9 +211,13 @@ function plan(start,stops,end){
   return{order:ord.slice(1).map(i=>stops[i-1]),miles:best};
 }
 const lookup=id=>items.find(i=>i.id===id)||(search&&search.items||[]).find(i=>i.id===id)||hits.find(i=>i.id===id)||runItems[id];
+function renderSugg(){const sg=suggestions(5);
+  $('sugg').innerHTML=sg.length?`<h2 style="margin-top:10px">Worth adding along the way</h2><div class="sum">Within ${rtOn()?$('tripw').value+' mi of your route':'a short detour of this run'}, ranked by payoff after the extra driving. "+ Add" slots it in where it costs the least.</div>`+
+   sg.map(i=>`<div class="sg"><div class="st"><b>${esc(i.t)}</b><div>${i.p>0?money(i.p):'free'} · worth ~${money(i.v.best)} · +${i.det.toFixed(1)} mi detour · net ~${money(i.net)}${fit(i)?' · '+fit(i):''}</div></div><a href="${esc(i.u)}" target="_blank" rel="noopener" style="font-size:13px;color:var(--go)">Listing</a><button class="add" data-sadd="${esc(i.id)}">+ Add</button></div>`).join('')+
+   (sg.length>1?`<div class="acts"><button data-saddall="1">+ Add all ${sg.length}</button></div>`:''):'<div class="sum" style="margin-top:8px">Nothing else worth a detour along this run right now.</div>'}
 function renderRun(){
   runLayer.clearLayers();const stops=run.map(lookup).filter(Boolean);
-  $('run').style.display=stops.length?'block':'none';if(!stops.length)return;
+  $('run').style.display=stops.length?'block':'none';if(!stops.length){runPath=null;return}
   const start=me||{la:stops[0].la,lo:stops[0].lo},m=$('end').value;let end=m==='start'?start:m==='home'?home:null;
   if(m==='dest'&&rt&&rt.dest)end={la:rt.dest.la,lo:rt.dest.lo,n:rt.dest.n};
   if(m==='yard'){const ys=(yards||[]).filter(y=>y.k==='scrap'||y.k==='recycle');if(ys.length){const last=plan(start,stops,null).order.slice(-1)[0];end=ys.reduce((a,b)=>dist(last.la,last.lo,b.la,b.lo)<dist(last.la,last.lo,a.la,a.lo)?b:a);end={la:end.la,lo:end.lo,n:end.n}}}
@@ -222,6 +228,7 @@ function renderRun(){
   const drive=p.miles*1.3,worth=p.order.reduce((a,s)=>a+((s.v&&s.v.best)||0),0),cost=p.order.reduce((a,s)=>a+(s.p||0),0),fuel=drive/cfg.mpg*cfg.gas;
   $('sum').textContent=`${p.order.length} stops · about ${drive.toFixed(0)} road miles · worth about ${money(worth)}${cost?', costs '+money(cost):''}, gas about ${money(fuel)} → net about ${money(worth-cost-fuel)}${m==='home'&&!home?' · home not set: tap "Set home = here" when you are home':''}${m==='dest'&&end?' · ends at '+esc(end.n||'destination'):''}${m==='dest'&&!end?' · no route set':''}${m==='yard'&&end?' · ends at '+esc(end.n||'scrap yard'):''}${m==='yard'&&!end?' · scrap yard list still loading':''}${me?'':' · no GPS yet, starting from the first stop'}${p.order.length>9?' · Google Maps takes 9 stops per link; the link covers the first 9':''}`;
   const o=p.order.slice(0,9),dest=end||o[o.length-1],way=(end?o:o.slice(0,-1)).map(s=>s.la+','+s.lo).join('|');
+  runPath=[start,...p.order];if(end)runPath.push(end);renderSugg();
   $('gmaps').href=`https://www.google.com/maps/dir/?api=1${me?`&origin=${me.la},${me.lo}`:''}&destination=${dest.la},${dest.lo}${way?'&waypoints='+encodeURIComponent(way):''}&travelmode=driving`;
 }
 
@@ -286,6 +293,16 @@ async function buildRoute(dest){const from=me||home;if(!from){toast('Need your p
   map.fitBounds(L.latLngBounds(pts),{padding:[20,20]});follow=false;drawRoute();render()}
 function tripSum(rows){if(!rt)return'Type a destination or tap "Tap map", then tap Route.';const n=rows.filter(i=>!run.includes(i.id)).length;
   return `To <b style="color:var(--tx)">${esc(rt.dest.n||'destination')}</b>: ${rt.mi.toFixed(0)} mi, about ${Math.round(rt.mins)} min · ${n} finds within ${$('tripw').value} mi of the route, sorted by payoff after the detour.`}
+let runPath=null;   // [start, ...ordered stops, end] from the last run plan
+function insertCost(x,path){if(!path||path.length<2)return{mi:1e9,at:0};let best=1e9,at=0;
+  for(let j=0;j<path.length-1;j++){const a=path[j],b=path[j+1],c=dist(a.la,a.lo,x.la,x.lo)+dist(x.la,x.lo,b.la,b.lo)-dist(a.la,a.lo,b.la,b.lo);if(c<best){best=c;at=j}}
+  return{mi:Math.max(0,best)*1.3,at}}
+function corridorPath(){if(rtOn())return rt.pts.map(p=>({la:p[0],lo:p[1]}));return runPath}
+function candPool(){const br=blockRe(),pv=$('price').value;return items.filter(i=>!hidden.has(i.id)&&!run.includes(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)===''&&priceOk(i,pv)&&ageOk(i,$('age').value)&&i.s>=3&&i.v&&i.v.best>=15)}
+function suggestions(n){const path=corridorPath();if(!path)return[];const w=rtOn()?+$('tripw').value:2;
+  return candPool().map(i=>{const ins=insertCost(i,path);const fuel=ins.mi/cfg.mpg*cfg.gas;return{...i,det:ins.mi,net:i.v.best-(i.p||0)-fuel}})
+    .filter(i=>i.det<=w*2.6&&i.net>8).sort((a,b)=>(b.net+(b.px==='exact'?8:0)-b.det*2)-(a.net+(a.px==='exact'?8:0)-a.det*2)).slice(0,n)}
+function addStops(list){list.forEach(i=>{if(!run.includes(i.id)){run.push(i.id);runItems[i.id]=i}});LS('sr_run',run);LS('sr_runitems',runItems);render()}
 function roi(i){const b=(i.v&&i.v.best)||0;return (b-(i.p||0)-(i.fuel||0))/Math.max(1,(i.p||0)+(i.fuel||0))}
 function enrich(i){const dm=me?dist(me.la,me.lo,i.la,i.lo):null,best=(i.v&&i.v.best)||0;
   if(mode==='radar'&&rtOn()){const o=offRoute(i),fuel=trip(o.off*2);return{...i,dm,off:o.off,along:o.along,fuel,net:best-(i.p||0)-fuel}}
@@ -400,6 +417,8 @@ document.addEventListener('click',async e=>{const t=e.target.closest('button,[da
   if(d.ad){const it=lookup(d.ad);if(it){adT.add(normT(it.t));LS('sr_adtitles',[...adT])}hidden.add(d.ad);run=run.filter(x=>x!==d.ad);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Hidden, along with any repeats of that ad');render()}
   if(d.hide){hidden.add(d.hide);run=run.filter(x=>x!==d.hide);LS('sr_hidden',[...hidden]);LS('sr_run',run);render()}
   if(d.hdel){haul=haul.filter(h=>h.id!==d.hdel);LS('sr_haul',haul);send({c:'sold',id:d.hdel,sold:null});render();return}
+  if(d.sadd){const i=items.find(x=>x.id===d.sadd);if(i){addStops([i]);toast('Added to your run')}return}
+  if(d.saddall){const sg=suggestions(5);addStops(sg);toast('Added '+sg.length+' stops along the way');return}
   if(d.got){const it=lookup(d.got);haul.push({id:d.got,t:it?it.t:'',v:(it&&it.v&&it.v.best)||0,at:Date.now(),c:it&&it.c,src:it&&it.src,u:it&&it.u,paid:it&&it.p?Math.round(it.p):0,sold:null,how:''});LS('sr_haul',haul);hidden.add(d.got);run=run.filter(x=>x!==d.got);LS('sr_hidden',[...hidden]);LS('sr_run',run);toast('Added to your haul');render()}
   if(d.run){const it=lookup(d.run);if(run.includes(d.run))run=run.filter(x=>x!==d.run);else{run=[...run,d.run];if(it)runItems[d.run]=it}
     Object.keys(runItems).forEach(k=>{if(!run.includes(k))delete runItems[k]});LS('sr_run',run);LS('sr_runitems',runItems);render()}
@@ -452,10 +471,10 @@ $('tripx').onclick=()=>{rt=null;LS('sr_route',null);rtLayer.clearLayers();if($('
 $('tripplan').onclick=()=>{if(!rtOn())return toast('Set a route first.');const br=blockRe(),w=+$('tripw').value,pv=$('price').value;
   const pool=items.filter(i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)===''&&priceOk(i,pv)&&i.s>=3&&i.v&&i.v.best>=15)
     .map(i=>{const o=offRoute(i);return{...i,off:o.off,along:o.along,net:i.v.best-(i.p||0)-trip(o.off*2)}}).filter(i=>i.off<=w&&i.net>5);
-  pool.sort((a,b)=>(b.net+(b.px==='exact'?10:0))-(a.net+(a.px==='exact'?10:0)));const pick=pool.slice(0,8).sort((a,b)=>a.along-b.along);
-  if(!pick.length)return toast('Nothing worth stopping for within '+w+' mi of this route. Try a wider corridor or the Filters.');
-  run=pick.map(i=>i.id);runItems={};pick.forEach(i=>runItems[i.id]=i);LS('sr_run',run);LS('sr_runitems',runItems);$('end').value='dest';
-  toast(`Planned ${pick.length} stops along your route, in order. Message sellers before you go.`,6000);render();$('run').scrollIntoView({behavior:'smooth'})};
+  pool.sort((a,b)=>(b.net+(b.px==='exact'?10:0))-(a.net+(a.px==='exact'?10:0)));const kept=run.length,room=Math.max(0,10-kept),pick=pool.filter(i=>!run.includes(i.id)).slice(0,Math.min(8,room)).sort((a,b)=>a.along-b.along);
+  if(!pick.length)return toast(kept>=10?'Your run already has 10 stops.':'Nothing worth stopping for within '+w+' mi of this route. Try a wider corridor or the Filters.');
+  pick.forEach(i=>{run.push(i.id);runItems[i.id]=i});LS('sr_run',run);LS('sr_runitems',runItems);$('end').value='dest';
+  toast(kept?`Kept your ${kept} stop${kept>1?'s':''} and added ${pick.length} more along the route.`:`Planned ${pick.length} stops along your route, in order. Message sellers before you go.`,6000);render();$('run').scrollIntoView({behavior:'smooth'})};
 $('ahead').onclick=()=>{cfg.ahead=!cfg.ahead;LS('sr_cfg',cfg);if(cfg.ahead&&!hdg)toast('Road ahead turns on once you are driving: it follows the direction you are heading.');render()};
 $('list').addEventListener('change',e=>{const d=e.target.dataset;if(d.hpaid)haulSet(d.hpaid,'paid',e.target.value);else if(d.hsold)haulSet(d.hsold,'sold',e.target.value);else if(d.hhow)haulSet(d.hhow,'how',e.target.value)});
 $('modes').onclick=e=>{const b=e.target.closest('[data-preset]');if(b)applyPreset(b.dataset.preset)};
