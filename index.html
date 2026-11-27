@@ -106,7 +106,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 <div class="bar fbar"><button id="advbtn" aria-expanded="false">Filters ▾</button><span id="fsum"></span><button id="autoplan" class="go">Plan my run</button></div>
 <div class="bar" id="adv">
   <select id="age" aria-label="Posted within"><option value="0.125">Last 3 hours</option><option value="0.25">Last 6 hours</option><option value="0.5">Last 12 hours</option><option value="1">Last 24 hours</option><option value="3">Last 3 days</option><option value="7" selected>Last 7 days</option><option value="any">Any age</option></select>
-  <select id="rad" aria-label="Range"><option value="2">2 mi</option><option value="5">5 mi</option><option value="10" selected>10 mi</option><option value="25">25 mi</option><option value="999">Any distance</option></select>
+  <select id="rad" aria-label="Range"><option value="2">2 mi</option><option value="5">5 mi</option><option value="10" selected>10 mi</option><option value="25">25 mi</option><option value="50">50 mi</option><option value="999">Any distance</option></select>
   <select id="min" aria-label="Minimum value"><option value="5">Top value only</option><option value="4" selected>Good and up</option><option value="3">Include materials</option><option value="1">Everything</option></select>
   <select id="price" aria-label="Price"><option value="0">Free only</option><option value="10">Free + under $10</option><option value="25">Free + under $25</option><option value="40" selected>Free + cheap (under $40)</option><option value="cheap">Cheap only (paid, under $40)</option><option value="any">Any price</option></select>
   <select id="kind" aria-label="Listing type"><option value="items" selected>Items only (no stores, no yard sales)</option><option value="yard">Items + yard &amp; estate sales</option><option value="yardonly">Yard &amp; estate sales only</option></select>
@@ -146,7 +146,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 <h3>Quick modes (top row)</h3><dl>
 <dt>🔥 Just posted</dt><dd>Free things posted in the last 6 hours, newest first. Best for grabbing stuff the moment it goes out.</dd><dt>⭐ Best near me</dt><dd>Free and cheap items within your range, best payoff after gas first. The everyday view.</dd>
 <dt>Free only</dt><dd>Only $0 listings, nearest first.</dd>
-<dt>Scrap metal</dt><dd>Metal, appliances, wire and anything with scrap weight.</dd>
+<dt>Scrap metal</dt><dd>Free scrap targets: metal, copper/aluminum, appliances (washers, dryers, dishwashers, AC units), filing cabinets, steel shelving, motorcycles, boat trailers and electronics (copiers, printers, stereos, computers).</dd>
 <dt>Big flips</dt><dd>Things worth $40+ to resell.</dd>
 <dt>Yard sales</dt><dd>Yard, garage and estate sales in the last 3 days.</dd>
 <dt>🧭 Route</dt><dd>Type where you're headed (or tap the map): shows finds along the drive, and "Plan pickups along route" builds the stops in order.</dd>
@@ -295,10 +295,10 @@ function kindOf(i){if(i.k==='biz'||i.p===1||(!(i.p>0)&&SCAM.test(i.t)&&!/broken|
 function priceOk(i,pv){const p=i.p||0;if(pv==='any')return true;if(pv==='cheap')return p>=2&&p<=40;return p<=+pv}
 function kindOk(i,kv){const k=kindOf(i);if(k==='biz')return false;if(kv==='yardonly')return k==='yard';return kv==='yard'||k!=='yard'}
 function blockRe(){const w=cfg.block.split(',').map(s=>s.trim()).filter(Boolean).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));return w.length?new RegExp('\\b('+w.join('|')+')','i'):null}
-const FOCUS={scrap:i=>['scrap','appliance'].includes(i.c)||(i.v&&i.v.m&&i.v.m!=='none'&&(i.v.sc||0)>=5)||/metal|copper|alumin|brass|steel|iron|wire|radiator|catalytic|battery|batteries|motor/i.test(i.t),
+const FOCUS={scrap:i=>['scrap','appliance','electronics'].includes(i.c)||/a\/?c\b|air condition|condenser|compressor|motorcycle|trailer|filing|shelv|copier|printer|stereo|computer|washer|dryer|dishwasher|water heater|generator/i.test(i.t)||(i.v&&i.v.m&&i.v.m!=='none'&&(i.v.sc||0)>=5)||/metal|copper|alumin|brass|steel|iron|wire|radiator|catalytic|battery|batteries|motor/i.test(i.t),
   flip:i=>['resale','vehicle','electronics','appliance'].includes(i.c)&&((i.v&&i.v.best)||0)>=40};
-const PRESETS={fresh:{price:'0',kind:'items',min:'1',sort:'new',focus:'',age:'0.25'},best:{price:'40',kind:'items',min:'4',sort:'net',focus:'',age:'7'},free:{price:'0',kind:'items',min:'2',sort:'near',focus:'',age:'7'},
-  scrap:{price:'40',kind:'items',min:'1',sort:'net',focus:'scrap',age:'7'},flip:{price:'40',kind:'items',min:'3',sort:'val',focus:'flip',age:'7'},
+const PRESETS={fresh:{price:'0',kind:'items',min:'1',sort:'new',focus:'',age:'0.25'},best:{price:'0',kind:'items',min:'4',sort:'net',focus:'',age:'7'},free:{price:'0',kind:'items',min:'2',sort:'near',focus:'',age:'7'},
+  scrap:{price:'0',kind:'items',min:'1',sort:'net',focus:'scrap',age:'7'},flip:{price:'40',kind:'items',min:'3',sort:'val',focus:'flip',age:'7'},
   yard:{price:'any',kind:'yardonly',min:'1',sort:'near',focus:'',age:'3'}};
 function applyPreset(k){const p=PRESETS[k];if(!p)return;['price','kind','min','sort','age'].forEach(f=>$(f).value=p[f]);cfg.focus=p.focus;cfg.preset=k;save()}
 function when(i){return new Date(i.posted||i.first||0).getTime()}
