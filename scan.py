@@ -6,6 +6,7 @@ value, geocodes them and writes listings.json for the radar page.
 """
 import json, re, sys, time, hashlib, os, html, urllib.request, urllib.parse
 from datetime import datetime, timezone
+import datetime as _dt
 
 CFG = json.load(open("config.json"))
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
@@ -167,6 +168,27 @@ def src_trashnothing(seen, rows):
             rows.append(("https://trashnothing.com" + m.group(1), re.sub(r"\s*\([^()]*\)\s*$", "", full), loc.group(1) if loc else "", lid, "tn"))
         time.sleep(2)
 
+def posted_from_text(h):
+    """Nextdoor/Facebook show age as '20 hr ago', '3 days ago', 'Nov 18' - turn it into a posted time."""
+    now = _dt.datetime.now()
+    m = re.search(r"(\d+)\s*(min|hr|hour|day|week|wk)s?\s*ago", h or "", re.I)
+    if m:
+        n, u = int(m.group(1)), m.group(2).lower()
+        d = {"min": _dt.timedelta(minutes=n), "hr": _dt.timedelta(hours=n), "hour": _dt.timedelta(hours=n),
+             "day": _dt.timedelta(days=n), "week": _dt.timedelta(weeks=n), "wk": _dt.timedelta(weeks=n)}[u]
+        return (now - d).strftime("%Y-%m-%dT%H:%M")
+    m = re.search(r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{1,2})\b", h or "")
+    if m:
+        try:
+            d = _dt.datetime.strptime(f"{m.group(1)} {m.group(2)} {now.year}", "%b %d %Y")
+            if d > now + _dt.timedelta(days=2): d = d.replace(year=now.year - 1)
+            return d.strftime("%Y-%m-%dT12:00")
+        except ValueError: return ""
+    if re.search(r"\byesterday\b", h or "", re.I): return (now - _dt.timedelta(days=1)).strftime("%Y-%m-%dT12:00")
+    if re.search(r"\btoday\b|just now", h or "", re.I): return now.strftime("%Y-%m-%dT%H:%M")
+    return ""
+BPOSTED = {}
+
 def src_browser(seen, rows):
     p = "browser_rows.json"
     if not os.path.exists(p) or time.time() - os.path.getmtime(p) > 14 * 3600: return   # overnight gap (11 PM-7 AM) must not drop them
@@ -175,6 +197,8 @@ def src_browser(seen, rows):
         if lid in seen: continue
         seen.add(lid); PRICE[lid] = r.get("p", 0)
         if r.get("img"): IMG[lid] = r["img"]
+        ps = posted_from_text(r.get("h", "") + " " + r.get("age", ""))
+        if ps: BPOSTED[lid] = ps
         rows.append((r["u"], r["t"], r.get("h", ""), lid, r["src"]))
 
 IMG = {}
@@ -327,6 +351,7 @@ def main():
         k = kind(title, flood.get(norm(title), 0))
         if k == "biz": dropped["biz"] += 1; continue
         it = {"id": lid, "t": title[:110], "h": hood[:60], "u": url, "c": cat, "s": score, "src": src, "first": old.get(lid, {}).get("first", NOW)}
+        if BPOSTED.get(lid): it["posted"] = BPOSTED[lid]
         ex = exact.get(lid)
         if not ex and not seed and src == "cl" and score >= 3 and lookups < CFG.get("max_detail_lookups", 25):
             lookups += 1
