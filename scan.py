@@ -30,7 +30,7 @@ HOOD = {"gulfport":(27.748,-82.703),"st pete beach":(27.725,-82.741),"madeira be
 BIZ = (r"^\W*(iso|wtb|wanted|looking for|in search of)\b|\bin search of\b|\bwtb\b|^\W*\(\(|read ad\b|\d{1,2}\s?%\s?off|\bon sale\b|\ball on sale|\bsale on\b|\bsale\s*:|super sale|summer\s+sale|black friday|cyber monday|dollar down|come in today|"
        r"financ|wholesale|factory direct|warehouse (sale|event)|largest|thousands of pieces|many to choose|starting at|open floor stock|floor stock|"
        r"\bservices\b|welding service|camera installs|installation|tv mounting|repairs?\b|specialist|handyman|remodeling|pressure washing|painting services|"
-       r"paying cash|cash (for|4)|we (will )?buy|we pay|\bbuying\b|hauled away for|\bhauling\b|junk removal|we haul|we remove|"
+       r"paying cash|cash (for|4)|we (will )?buy|\bi (will )?buy\b|\bi pay\b|we pay|\bbuying\b|hauled away for|\bhauling\b|junk removal|we haul|we remove|"
        r"shop local|small business|body shop|thrift store|boutique|free shipping|buy now|best deal|grand opening|call (now|today)|appointment|"
        r"free (estimate|quote)s?|years old\?|roof (replacement|inspection|repair)|delivered to you|delivery available|in stock|\bdealer|\bpart ?out\b|\bpartout")
 YARD = (r"(yard|garage|gsrage|estate|moving|multi-?family|community|rummage|tag|clear ?out|clearance|shutdown|liquidation|closing|warehouse|clothing|plant)\s+sale|"
