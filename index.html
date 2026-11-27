@@ -152,7 +152,7 @@ async function setupLink(){
   const th=await crypto.subtle.digest('SHA-256',new Uint8Array([...kraw,...enc.encode('topic')]));
   const base='sr'+hex(th).slice(0,20);
   link={K:await crypto.subtle.importKey('raw',kraw,'AES-GCM',false,['encrypt','decrypt']),cmd:base+'-cmd',out:base+'-out',alerts:base+'-alerts'};
-  listen();send({c:'ping'});updateLinkUI();
+  listen();send(me?{c:'ping',la:+me.la.toFixed(3),lo:+me.lo.toFixed(3)}:{c:'ping'});updateLinkUI();
 }
 async function seal(obj){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:enc.encode('j')},link.K,enc.encode(JSON.stringify(obj)));return 'j'+b64e(new Uint8Array([...iv,...new Uint8Array(ct)]))}
 async function unseal(s){const flag=s[0],b=b64d(s.slice(1));const raw=await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12),additionalData:enc.encode(flag)},link.K,b.slice(12));
@@ -422,6 +422,6 @@ $('recenter2').onclick=()=>$('recenter').click();
 if(!LS('sr_tip'))$('tip').style.display='flex';$('tipx').onclick=()=>{$('tip').style.display='none';LS('sr_tip',1)};
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 {const c0=LS('sr_cfg');if(!c0||c0.preset===undefined)applyPreset('best')}
-loadYards();renderLinks();setupLink();load();loadEvents();setInterval(loadEvents,3600e3);setInterval(()=>load(false),180000);setInterval(()=>{if(link)send({c:'ping'})},300000);
+loadYards();renderLinks();setupLink();load();loadEvents();setInterval(loadEvents,3600e3);setInterval(()=>load(false),180000);setInterval(()=>{if(link)send(me&&!meManual?{c:'ping',la:+me.la.toFixed(3),lo:+me.lo.toFixed(3)}:{c:'ping'})},300000);
 window.addEventListener('pagehide',()=>{items.forEach(i=>seen.add(i.id));LS('sr_seen',[...seen])});
 </script></body></html>
