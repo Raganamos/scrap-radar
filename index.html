@@ -131,7 +131,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 <div id="run">
   <h2>My pickup run</h2>
   <div class="bar" style="padding:0;background:none;border:0">
-    <select id="end" aria-label="Where the run ends"><option value="last">End at last stop</option><option value="start">Return to where I am</option><option value="home">End at home</option><option value="yard">End at nearest scrap yard</option><option value="dest">End at route destination</option></select>
+    <select id="end" aria-label="Where the run ends"><option value="last">End at last stop</option><option value="start">Return to where I am</option><option value="home">End at home base</option><option value="yard">End at nearest scrap yard</option><option value="dest">End at route destination</option></select>
     <button id="sethome">Set home = here</button><button id="clear">Clear run</button>
   </div>
   <ol id="stops"></ol><div class="sum" id="sum"></div>
@@ -517,6 +517,7 @@ $('rad').value=cfg.rad;$('min').value=cfg.min;$('age').value=cfg.age||'7';$('yar
 const save=()=>{Object.assign(cfg,{mpg:+$('mpg').value||15,gas:+$('gas').value||0,rad:$('rad').value,min:$('min').value,age:$('age').value,price:$('price').value,kind:$('kind').value,sort:$('sort').value,block:$('block').value});LS('sr_cfg',cfg);render()};
 ['mpg','gas','block'].forEach(k=>$(k).onchange=save);['rad','min','price','kind','sort','age'].forEach(k=>$(k).onchange=()=>{if(['min','price','kind','sort'].includes(k)){cfg.preset='';if(k!=='sort')cfg.focus=''}save()});$('src').onchange=$('end').onchange=render;$('q').oninput=render;
 $('clear').onclick=()=>{run=[];runItems={};LS('sr_run',run);LS('sr_runitems',runItems);render()};
+{const m=location.hash.match(/home=(-?[\d.]+),(-?[\d.]+)(?:,([^&]*))?/);if(m){home={la:+m[1],lo:+m[2],n:m[3]?decodeURIComponent(m[3]):'Home'};LS('sr_home',home);history.replaceState(null,'',location.pathname);setTimeout(()=>toast('Home set to '+home.n),800)}}
 $('sethome').onclick=()=>{if(me){home={la:me.la,lo:me.lo};LS('sr_home',home);$('sethome').textContent='Home saved';$('end').value='home';render()}};
 $('recenter').onclick=()=>{follow=true;if(me)map.setView([me.la,me.lo],Math.max(map.getZoom(),11))};
 $('voice').onclick=()=>{voice=!voice;$('voice').textContent='Voice alerts '+(voice?'on':'off');$('voice').classList.toggle('on',voice);if(voice&&window.speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance('Voice alerts on'))};
