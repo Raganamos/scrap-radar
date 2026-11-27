@@ -87,7 +87,7 @@
   "max_calls_per_day": 12,
   "retell_from_number": null,
   "retell_voice_from_agent": "agent_825e9bad62cdb077764a8fc153",
-  "watch_every_min": 15,
+  "watch_every_min": 30,
   "offerup_queries": [
     "free",
     "curb",
@@ -96,7 +96,7 @@
     "free metal"
   ],
   "home_area": "lakeland",
-  "browser_every_min": 60,
+  "browser_every_min": 180,
   "calendar_events": [
     {
       "id": "usf-fall26",
