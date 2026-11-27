@@ -38,6 +38,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 .t{font-weight:600;color:var(--tx);text-decoration:none}.top{display:flex;gap:8px;align-items:baseline}.top .t{flex:1;min-width:0}
 .dd{flex:0 0 auto;font:700 12.5px ui-monospace,monospace;color:var(--go)}.vl{font-size:13.5px;margin:3px 0;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
 .vl b{color:var(--tx)}.vl .fr{color:#4ade80}.vl .pr{color:#fbbf24}.vl .net{color:var(--go);font-weight:600}.vl .tag{margin:0}
+.loc{font-size:12.5px;margin:2px 0}.loc.ok{color:#4ade80}.loc.warn{color:#fbbf24}
 .more{font-size:13px;margin:6px 0;padding:8px;border-radius:8px;background:var(--pan2)}.more b{color:var(--go)}.more .mut,.mut{color:var(--mut);font-size:12px;margin-top:3px}
 .acts.main button,.acts.main a{flex:1 1 0;padding:7px 4px;min-height:36px}
 .thumb{float:right;width:64px;height:64px;object-fit:cover;border-radius:8px;margin:0 0 4px 8px}
@@ -159,7 +160,7 @@ button{cursor:pointer}button.on,button.go{background:var(--go);color:#04130a;bor
 <dt>FREE / $ · worth · net</dt><dd>Price, estimated value (resale or scrap, whichever is higher), and what's left after the asking price and gas.</dd>
 <dt>+ Run</dt><dd>Adds it to your pickup run (tap again to remove).</dd>
 <dt>Message</dt><dd>Copies a ready-to-send "Is this still available?" message and opens the listing so you can paste it.</dd>
-<dt>Go</dt><dd>Turn-by-turn directions in Google Maps.</dd>
+<dt>Go</dt><dd>Turn-by-turn directions in Google Maps, to the street address when the listing has one.</dd><dt>📍 line</dt><dd><span style="color:#4ade80">Green</span> = real address or exact pin, you can drive straight there. <span style="color:#fbbf24">Amber "Area only"</span> = OfferUp/Facebook/Nextdoor and some Craigslist posts only give the neighborhood, so message the seller for the address first ("Go (area)" only gets you to the neighborhood). Plan my run now puts real-address stops first.</dd>
 <dt>More</dt><dd>Value details, 📞 Check availability (Net Hero calls the seller for you, Craigslist only), Open listing, ✓ Got it (adds it to your Haul), Gone / skip (hides it), Ad / spam (hides it and every repeat of it).</dd>
 <dt>Tags</dt><dd><i>trailer?</i> or <i>2 people</i> = big or heavy · <i>also on…</i> = same item on another site · <i>new</i> = since you last looked. Faded cards are over 3 days old.</dd>
 </dl>
@@ -264,7 +265,7 @@ function plan(start,stops,end){
 const lookup=id=>items.find(i=>i.id===id)||(search&&search.items||[]).find(i=>i.id===id)||hits.find(i=>i.id===id)||runItems[id];
 function renderSugg(){const sg=suggestions(5);
   $('sugg').innerHTML=sg.length?`<h2 style="margin-top:10px">Worth adding along the way</h2><div class="sum">Within ${rtOn()?$('tripw').value+' mi of your route':'a short detour of this run'}, ranked by payoff after the extra driving. "+ Add" slots it in where it costs the least.</div>`+
-   sg.map(i=>`<div class="sg"><div class="st"><b>${esc(i.t)}</b><div>${i.p>0?money(i.p):'free'} · worth ~${money(i.v.best)} · +${i.det.toFixed(1)} mi detour · net ~${money(i.net)}${fit(i)?' · '+fit(i):''}</div></div><a href="${esc(i.u)}" target="_blank" rel="noopener" style="font-size:13px;color:var(--go)">Listing</a><button class="add" data-sadd="${esc(i.id)}">+ Add</button></div>`).join('')+
+   sg.map(i=>`<div class="sg"><div class="st"><b>${esc(i.t)}</b><div>${i.p>0?money(i.p):'free'} · worth ~${money(i.v.best)} · +${i.det.toFixed(1)} mi detour · ${i.addr?'📍 '+esc(i.addr):i.px==='exact'?'exact pin':'<span style="color:#fbbf24">area only</span>'} · net ~${money(i.net)}${fit(i)?' · '+fit(i):''}</div></div><a href="${esc(i.u)}" target="_blank" rel="noopener" style="font-size:13px;color:var(--go)">Listing</a><button class="add" data-sadd="${esc(i.id)}">+ Add</button></div>`).join('')+
    (sg.length>1?`<div class="acts"><button data-saddall="1">+ Add all ${sg.length}</button></div>`:''):'<div class="sum" style="margin-top:8px">Nothing else worth a detour along this run right now.</div>'}
 function renderRun(){
   runLayer.clearLayers();const stops=run.map(lookup).filter(Boolean);
@@ -275,16 +276,16 @@ function renderRun(){
   const p=plan(start,stops,end),path=[[start.la,start.lo],...p.order.map(s=>[s.la,s.lo])];if(end)path.push([end.la,end.lo]);
   L.polyline(path,{color:'#4ade80',weight:4,opacity:.8}).addTo(runLayer);
   p.order.forEach((s,i)=>L.marker([s.la,s.lo],{icon:L.divIcon({className:'',html:`<div class="num">${i+1}</div>`,iconSize:[22,22],iconAnchor:[11,11]}),zIndexOffset:900}).addTo(runLayer).bindPopup(esc(s.t)));
-  let prev=start;$('stops').innerHTML=p.order.map(s=>{const leg=dist(prev.la,prev.lo,s.la,s.lo);prev=s;return `<li>${esc(s.t)} <span style="color:var(--mut)">· ${esc(s.h)} · ${leg.toFixed(1)} mi leg${s.p?' · $'+Math.round(s.p):''}</span></li>`}).join('');
+  let prev=start;$('stops').innerHTML=p.order.map(s=>{const leg=dist(prev.la,prev.lo,s.la,s.lo);prev=s;return `<li>${esc(s.t)} <span style="color:var(--mut)">· ${s.addr?esc(s.addr):esc(s.h)} · ${leg.toFixed(1)} mi leg${s.p?' · $'+Math.round(s.p):''}</span>${s.addr||s.px==='exact'?'':' <span style="color:#fbbf24">· ask for address</span>'}</li>`}).join('');
   const drive=p.miles*1.3,worth=p.order.reduce((a,s)=>a+((s.v&&s.v.best)||0),0),cost=p.order.reduce((a,s)=>a+(s.p||0),0),fuel=drive/cfg.mpg*cfg.gas;
   $('sum').textContent=`${p.order.length} stop${p.order.length===1?'':'s'} · about ${drive.toFixed(0)} road miles · worth about ${money(worth)}${cost?', costs '+money(cost):''}, gas about ${money(fuel)} → net about ${money(worth-cost-fuel)}${m==='home'&&!home?' · home not set: tap "Set home = here" when you are home':''}${m==='dest'&&end?' · ends at '+esc(end.n||'destination'):''}${m==='dest'&&!end?' · no route set':''}${m==='yard'&&end?' · ends at '+esc(end.n||'scrap yard'):''}${m==='yard'&&!end?' · scrap yard list still loading':''}${me?'':' · no GPS yet, starting from the first stop'}${p.order.length>9?' · Google Maps takes 9 stops per link; the link covers the first 9':''}`;
-  const o=p.order.slice(0,9),dest=end||o[o.length-1],way=(end?o:o.slice(0,-1)).map(s=>s.la+','+s.lo).join('|');
+  const o=p.order.slice(0,9),dest=end||o[o.length-1],way=(end?o:o.slice(0,-1)).map(s=>s.addr?addrQ(s):s.la+','+s.lo).join('|');
   runPath=[start,...p.order];if(end)runPath.push(end);renderSugg();
   $('gmaps').href=`https://www.google.com/maps/dir/?api=1${me?`&origin=${me.la},${me.lo}`:''}&destination=${dest.la},${dest.lo}${way?'&waypoints='+encodeURIComponent(way):''}&travelmode=driving`;
 }
 
 /* ---------- listing cards ---------- */
-const BIZ=/^\W*(iso|wtb|wanted|looking for|in search of)\b|\bin search of\b|\bwtb\b|^\W*\(\(|read ad\b|\d{1,2}\s?%\s?off|\bon sale\b|\bsale on\b|\bsale\s*:|super sale|black friday|cyber monday|dollar down|come in today|financ|wholesale|factory direct|warehouse (sale|event)|largest|thousands of pieces|many to choose|starting at|floor stock|\bservices\b|welding service|camera installs|installation|tv mounting|repairs?\b|specialist|handyman|remodeling|pressure washing|painting services|paying cash|cash (for|4)|we (will )?buy|\bi (will )?buy\b|\bi pay\b|we pay|\bbuying\b|hauled away for|\bhauling\b|junk removal|we haul|shop local|small business|body shop|thrift store|boutique|free shipping|buy now|best deal|grand opening|call (now|today)|appointment|free (estimate|quote)s?|delivered to you|delivery available|in stock|\bdealer|\bpart ?out/i;
+const BIZ=/^\s*\*\*.*\*\*\s*$|^\W*(iso|wtb|wanted|looking for|in search of)\b|\bin search of\b|\bwtb\b|^\W*\(\(|read ad\b|\d{1,2}\s?%\s?off|\bon sale\b|\bsale on\b|\bsale\s*:|super sale|black friday|cyber monday|dollar down|come in today|financ|wholesale|factory direct|warehouse (sale|event)|largest|thousands of pieces|many to choose|starting at|floor stock|\bservices\b|welding service|camera installs|installation|tv mounting|repairs?\b|specialist|handyman|remodeling|pressure washing|painting services|paying cash|cash (for|4)|we (will )?buy|\bi (will )?buy\b|\bi pay\b|we pay|\bbuying\b|hauled away for|\bhauling\b|junk removal|we haul|shop local|small business|body shop|thrift store|boutique|free shipping|buy now|best deal|grand opening|call (now|today)|appointment|free (estimate|quote)s?|delivered to you|delivery available|in stock|\bdealer|\bpart ?out/i;
 const YARD=/(yard|garage|gsrage|estate|moving|multi-?family|community|rummage|tag|clear ?out|clearance|shutdown|liquidation|closing|warehouse|clothing|plant)\s+sale|sale encore|closing down|liquidate|^\W*(for ?sale|garage sale|yard sale|moving sale|everything for sale)\W*$|things for sale|forsale/i;
 const normT=t=>(t||'').toLowerCase().replace(/[^a-z]+/g,' ').trim().slice(0,40);
 let adT=new Set(LS('sr_adtitles')||[]);
@@ -352,8 +353,12 @@ function corridorPath(){if(rtOn())return rt.pts.map(p=>({la:p[0],lo:p[1]}));retu
 function candPool(){const br=blockRe(),pv=$('price').value;return items.filter(i=>!hidden.has(i.id)&&!run.includes(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)===''&&priceOk(i,pv)&&ageOk(i,$('age').value)&&i.s>=3&&i.v&&i.v.best>=15)}
 function suggestions(n){const path=corridorPath();if(!path)return[];const w=rtOn()?+$('tripw').value:2;
   return candPool().map(i=>{const ins=insertCost(i,path);const fuel=ins.mi/cfg.mpg*cfg.gas;return{...i,det:ins.mi,net:i.v.best-(i.p||0)-fuel}})
-    .filter(i=>i.det<=w*2.6&&i.net>8).sort((a,b)=>(b.net+(b.px==='exact'?8:0)-b.det*2)-(a.net+(a.px==='exact'?8:0)-a.det*2)).slice(0,n)}
+    .filter(i=>i.det<=w*2.6&&i.net>8).sort((a,b)=>(b.net+(b.addr?25:b.px==='exact'?15:0)-b.det*2)-(a.net+(a.addr?25:a.px==='exact'?15:0)-a.det*2)).slice(0,n)}
 function addStops(list){list.forEach(i=>{if(!run.includes(i.id)){run.push(i.id);runItems[i.id]=i}});LS('sr_run',run);LS('sr_runitems',runItems);render()}
+function addrQ(i){return i.addr?(i.addr.replace(/\s+near\s+/i,' & ')+', '+(i.h||'')+', FL'):''}
+function goUrl(i){return 'https://www.google.com/maps/dir/?api=1&destination='+(i.addr?encodeURIComponent(addrQ(i)):i.la+','+i.lo)}
+function where(i){if(i.addr)return `<div class="loc ok">📍 ${esc(i.addr)}</div>`;if(i.px==='exact')return '<div class="loc ok">📍 Exact map pin</div>';
+  return `<div class="loc warn">📍 Area only. ${i.src==='cl'||!i.src?'Reply on the listing':'Message the seller'} for the address before driving</div>`}
 function roi(i){const b=(i.v&&i.v.best)||0;return (b-(i.p||0)-(i.fuel||0))/Math.max(1,(i.p||0)+(i.fuel||0))}
 function enrich(i){const dm=me?dist(me.la,me.lo,i.la,i.lo):null,best=(i.v&&i.v.best)||0;
   if(mode==='radar'&&rtOn()){const o=offRoute(i),fuel=trip(o.off*2);return{...i,dm,off:o.off,along:o.along,fuel,net:best-(i.p||0)-fuel}}
@@ -380,8 +385,8 @@ function card(i){const old=Date.now()-when(i)>3*864e5,ft=fit(i);const isNew=mode
   return `<div class="card s${i.s||1}${isNew?' new':''}${inRun?' in':''}${old?' old':''}">${i.img?`<img class="thumb" loading="lazy" alt="" src="${esc(i.img)}">`:''}
     <div class="top"><a class="t" href="${esc(i.u)}" target="_blank" rel="noopener">${esc(i.t)}</a>${dist0?`<span class="dd">${dist0}</span>`:''}</div>
     <div class="vl">${price}${worth}${net}${chips}</div>
-    <div class="m">${esc(i.h||'')}${i.posted?' · '+age(i.posted):''} · ${SRC[i.src]||'Craigslist'}</div>${callBox(i)}${detail}
-    <div class="acts main"><button class="${inRun?'':'add'}" data-run="${esc(i.id)}">${inRun?'✓ In run':'+ Run'}</button><button data-msg="${esc(i.id)}">Message</button><a href="https://www.google.com/maps/dir/?api=1&destination=${i.la},${i.lo}" target="_blank" rel="noopener">Go</a><button data-more="${esc(i.id)}" aria-expanded="${op}">${op?'Less ▴':'More ▾'}</button></div></div>`}
+    <div class="m">${esc(i.h||'')}${i.posted?' · '+age(i.posted):''} · ${SRC[i.src]||'Craigslist'}${i.ph?` · <a href="tel:${esc(i.ph)}" style="color:var(--go)">📞 ${esc(i.ph)}</a>`:''}${i.txt?' · text only':''}</div>${where(i)}${callBox(i)}${detail}
+    <div class="acts main"><button class="${inRun?'':'add'}" data-run="${esc(i.id)}">${inRun?'✓ In run':'+ Run'}</button><button data-msg="${esc(i.id)}">Message</button><a href="${goUrl(i)}" target="_blank" rel="noopener">${i.addr||i.px==='exact'?'Go':'Go (area)'}</a><button data-more="${esc(i.id)}" aria-expanded="${op}">${op?'Less ▴':'More ▾'}</button></div></div>`}
 
 /* ---------- main render ---------- */
 function render(){
@@ -495,8 +500,8 @@ $('swatch').onclick=()=>{const a=searchArgs();if(!a.q)return toast('Type what to
 ['sq','smax','srad'].forEach(k=>$(k).addEventListener('input',renderLinks));
 $('autoplan').onclick=()=>{const start=me||home;if(!start)return toast('Waiting for GPS (or tap the map to set where you are)');
   const r=Math.min(+$('rad').value,40),br=blockRe();
-  const pv=$('price').value,pool=items.filter(i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)===''&&priceOk(i,pv)&&i.s>=4&&i.v&&i.v.best>=15).map(i=>{const dm=dist(start.la,start.lo,i.la,i.lo);return{...i,dm,net:i.v.best-(i.p||0)-trip(dm*2)}}).filter(i=>i.dm<=r&&i.net>5);
-  pool.sort((a,b)=>(b.net+(b.px==='exact'?10:0))-(a.net+(a.px==='exact'?10:0)));
+  const pv=$('price').value,pool=items.filter(i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)===''&&priceOk(i,pv)&&ageOk(i,$('age').value)&&i.s>=4&&i.v&&i.v.best>=15).map(i=>{const dm=dist(start.la,start.lo,i.la,i.lo);return{...i,dm,net:i.v.best-(i.p||0)-trip(dm*2)}}).filter(i=>i.dm<=r&&i.net>5);
+  pool.sort((a,b)=>(b.net+(b.addr?30:b.px==='exact'?20:0))-(a.net+(a.addr?30:a.px==='exact'?20:0)));
   const pick=pool.slice(0,8);if(!pick.length)return toast('Nothing worth the gas in range yet. Widen the range or lower the value filter.');
   run=pick.map(i=>i.id);runItems={};pick.forEach(i=>runItems[i.id]=i);LS('sr_run',run);LS('sr_runitems',runItems);if(home)$('end').value='home';
   toast(`Planned ${pick.length} stops, best value for the drive. Check each listing (or tap Check availability) before you go.`,6000);render();$('run').scrollIntoView({behavior:'smooth'})};
@@ -532,9 +537,9 @@ $('trippick').onclick=()=>{rtPick=true;toast('Tap the map where you are headed.'
 $('tripw').onchange=()=>render();
 $('tripx').onclick=()=>{rt=null;LS('sr_route',null);rtLayer.clearLayers();if($('end').value==='dest')$('end').value='last';render()};
 $('tripplan').onclick=()=>{if(!rtOn())return toast('Set a route first.');const br=blockRe(),w=+$('tripw').value,pv=$('price').value;
-  const pool=items.filter(i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)===''&&priceOk(i,pv)&&i.s>=3&&i.v&&i.v.best>=15)
+  const pool=items.filter(i=>!hidden.has(i.id)&&!cfg.off.includes(i.c||'other')&&!(br&&br.test(i.t))&&kindOf(i)===''&&priceOk(i,pv)&&ageOk(i,$('age').value)&&i.s>=3&&i.v&&i.v.best>=15)
     .map(i=>{const o=offRoute(i);return{...i,off:o.off,along:o.along,net:i.v.best-(i.p||0)-trip(o.off*2)}}).filter(i=>i.off<=w&&i.net>5);
-  pool.sort((a,b)=>(b.net+(b.px==='exact'?10:0))-(a.net+(a.px==='exact'?10:0)));const kept=run.length,room=Math.max(0,10-kept),pick=pool.filter(i=>!run.includes(i.id)).slice(0,Math.min(8,room)).sort((a,b)=>a.along-b.along);
+  pool.sort((a,b)=>(b.net+(b.addr?30:b.px==='exact'?20:0))-(a.net+(a.addr?30:a.px==='exact'?20:0)));const kept=run.length,room=Math.max(0,10-kept),pick=pool.filter(i=>!run.includes(i.id)).slice(0,Math.min(8,room)).sort((a,b)=>a.along-b.along);
   if(!pick.length)return toast(kept>=10?'Your run already has 10 stops.':'Nothing worth stopping for within '+w+' mi of this route. Try a wider corridor or the Filters.');
   pick.forEach(i=>{run.push(i.id);runItems[i.id]=i});LS('sr_run',run);LS('sr_runitems',runItems);$('end').value='dest';
   toast(kept?`Kept your ${kept} stop${kept>1?'s':''} and added ${pick.length} more along the route.`:`Planned ${pick.length} stops along your route, in order. Message sellers before you go.`,6000);render();$('run').scrollIntoView({behavior:'smooth'})};
