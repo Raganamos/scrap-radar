@@ -68,7 +68,7 @@
       "radius_m": 30000
     }
   ],
-  "max_detail_lookups": 25,
+  "max_detail_lookups": 60,
   "scrap_prices": {
     "steel": 0.08,
     "copper": 3.25,
